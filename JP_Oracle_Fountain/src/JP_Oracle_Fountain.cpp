@@ -1,13 +1,15 @@
 /* 
  * Project JP_Oracle_Fountain
  * Author: JP Funk
- * Date: 04/09/2024
+ * Date: 04/15/2024 Monday Afternoon Code update
  * For comprehensive documentation and examples, please visit:
  * https://docs.particle.io/firmware/best-practices/firmware-template/
  */
 
 // Include Particle Device OS APIs
 #include "Particle.h"
+#include "Adafruit_VL53L0X.h"
+#include <SPI.h>
 #include "credentials.h"
 #include "Adafruit_MQTT.h"
 #include "Adafruit_MQTT/Adafruit_MQTT_SPARK.h"
@@ -16,6 +18,19 @@
 #include "Adafruit_SSD1306.h"
 #include "Adafruit_BME280.h"
 #include "IoTClassroom_CNM.h"
+#include "IoTTimer.h"
+#include "math.h"
+#include "Button.h"
+// OLED
+const int OLED_RESET=-1;
+int displayMode;
+
+// Reset Button
+int8_t RST;
+const int RESETBUTTON (RST);
+int resetBtn;
+int lastInterval;
+bool buttonState1;
 // Date and Time String
 String DateTime, TimeOnly; // String variable for Date and Time
 // Adafruit BME
@@ -25,16 +40,16 @@ const int delayTime =1000;
 bool status;
 int hexAddress, startime;
 float tempC, pressPA, humidRH, tempF, inHG;
-// OLED
-const int OLED_RESET=-1;
-int displayMode;
+// IoT Timers
+IoTTimer pumpTimer;
+IoTTimer displayTimer;
+int timerTime;
+int updateTime;
+void watchdogHandler() {
+// Do as little as possible in this function , preferably just a reset
+System.reset (RESET_NO_WAIT);
+}
 Adafruit_SSD1306 display(OLED_RESET);
-// Reset Button
-int8_t RST;
-const int RESETBUTTON (RST);
-int resetBtn;
-int lastInterval;
-
 TCPClient TheClient;
 Adafruit_MQTT_SPARK mqtt(&TheClient,AIO_SERVER,AIO_SERVERPORT,AIO_USERNAME,AIO_KEY); 
 // Setup the MQTT client class by passing in the WiFi client and MQTT server and login details. 
@@ -47,14 +62,13 @@ void MQTT_connect();
 bool MQTT_ping();
 // Let Device OS manage the connection to the Particle Cloud
 void getConc (); 
-SYSTEM_MODE(SEMI_AUTOMATIC);
-
+SYSTEM_MODE(AUTOMATIC);
 SYSTEM_THREAD(ENABLED);
 
 // View logs with CLI using 'particle serial monitor --follow'
 SerialLogHandler logHandler(LOG_LEVEL_INFO);
-
 // setup() runs once, when the device is first turned on
+
 void setup() {
 Serial.begin(9600);
 waitFor(Serial.isConnected,10000);
@@ -71,10 +85,10 @@ mqtt.subscribe(&buttonFeed);
 Particle.connect;  
 Time.zone (-7); // MST = -7, MDT = -6
 Particle.syncTime (); // Sync time with Particle Cloud
+
 display.begin(SSD1306_SWITCHCAPVCC, 0x3C); // OLED Functions
 display.display();
 delay(2000); 
-// OLED Display Rotation for Vertical viewing.
 display.clearDisplay();
 display.setTextSize(1);
 display.setTextColor(WHITE);
@@ -114,16 +128,38 @@ Adafruit_MQTT_Subscribe *subscription;
   }
   // Adafruit MQTT Publish functions
   Adafruit_MQTT_Publish *publish;
-  //if ((millis()-lastInterval) ) 
+  static unsigned int last;
+  if ((millis()-last)>10000 ) 
   if(mqtt.Update()) {
     tempFeed.publish(tempF);
     pressFeed.publish(inHG);
     humidFeed.publish(humidRH);
-  //  lastInterval = millis();
+    last = millis();
    }
      if (resetBtn) {
-    RESETBUTTON;
+    System.reset(RESET_NO_WAIT);
   }
+  if (displayTimer.isTimerReady()) {  //(millis() > startime + delayTime)
+    displayMode ++;
+    displayTimer.startTimer (5000);
+    if (displayMode %2 ==0) { //(displayMode %2 ==0) 
+      display.clearDisplay();
+      display.setCursor(0,0);
+      display.setTextSize(1);
+      display.printf("Temp F\n%0.2f\n", tempF);
+      display.printf("\nTemp C\n%0.2f\n", tempC);
+      display.printf("\nPressure\n%0.2f\n", inHG);
+      display.printf("\nHumidity\n%0.2f\n", humidRH);
+      display.display();
+      }
+        else {
+      display.clearDisplay(); // Date Time functions
+      display.setCursor(0,0);
+      display.setTextSize(1);
+      display.printf("Reset %i\n",resetBtn);
+      display.display();
+      }
+    }
 }
 
 // MQTT Adafruit.IO connections
