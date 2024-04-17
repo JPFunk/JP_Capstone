@@ -14,6 +14,8 @@
 #include <Adafruit_SSD1306.h>
 #include "Adafruit_BME280.h"
 #include "Button.h"
+#include "IotClassroom_CNM.h"
+#include "IoTTimer.h"
 // OLED
 const int OLED_RESET=-1;
 int rot;
@@ -21,6 +23,7 @@ Adafruit_VL53L0X lox = Adafruit_VL53L0X();
 int TOF;
 int targetLoc1, targetLoc2, targetLoc3, targetLoc0, prevTargetLoc;
 bool position;
+unsigned int rangeTime = 500;
 // Button
 //const int BUTTONPIN = D3;
 void buttonisClicked();
@@ -45,6 +48,10 @@ const int delayTime =1000;
 bool status;
 int hexAddress, startime;
 float tempC, pressPA, humidRH, tempF, inHG;
+// Millis Delay Timer
+// void delayRange();
+// const int DELAY = 500;
+// Timer timer(DELAY, delayRange);
 
 Adafruit_SSD1306 display(OLED_RESET);
 // Let Device OS manage the connection to the Particle Cloud
@@ -98,7 +105,8 @@ pinMode (LEDPIN2, OUTPUT);
 pinMode (LEDPIN3, OUTPUT);
 pinMode (PUMPIN, OUTPUT);
 // Millis Startime
-startTime = 0;
+startTime = millis();
+//startTime = 0;
 }
 // loop() runs over and over again, as quickly as it can execute.
 void loop() {
@@ -108,13 +116,15 @@ void loop() {
 if ((millis()-startTime) > sampleTime)
   if (targetLoc1 != prevTargetLoc){
   Serial.printf("%i\n", position);
+  startTime = millis();
    if (targetLoc1 == TRUE) {
       ledOnOff= !ledOnOff;
       } prevTargetLoc = targetLoc1;
       digitalWrite(LEDPIN, ledOnOff);
-       Serial.printf("LED1%i\n", targetLoc1);
-       startTime = millis();
+      Serial.printf("LED1%i\n", targetLoc1);
+       
     }
+
 if ((millis()-startTime) > sampleTime)
   if (targetLoc2 != prevTargetLoc){
   Serial.printf("%i\n", position);
@@ -122,8 +132,8 @@ if ((millis()-startTime) > sampleTime)
       ledOnOff2= !ledOnOff2;
       } prevTargetLoc = targetLoc2;
       digitalWrite(LEDPIN2, ledOnOff2);
-       Serial.printf("LED2 On%i\n",targetLoc2);
-      startTime = millis();
+      Serial.printf("LED2 On%i\n",targetLoc2);
+       startTime = millis();
     }
 
 if ((millis()-startTime) > sampleTime)
@@ -133,31 +143,39 @@ if ((millis()-startTime) > sampleTime)
       ledOnOff3= !ledOnOff3;
       } prevTargetLoc = targetLoc3;
       digitalWrite(LEDPIN3, ledOnOff3);
-       Serial.printf("LED3 On%i\n", targetLoc3);
+      Serial.printf("LED3 On%i\n", targetLoc3);
        startTime = millis();
     }
 
   if (measure.RangeStatus != 4) {  // phase failures have incorrect data
-    if(measure.RangeMilliMeter <= 75){
-      targetLoc1 =TRUE;
-      targetLoc2 =FALSE; targetLoc3 =FALSE; targetLoc0 =FALSE;
-      Serial.printf("targetPos 1%i\n", targetLoc1);
+    if(measure.RangeMilliMeter <= 70){
+      targetLoc1 = TRUE;
+      targetLoc2 = FALSE;
+      targetLoc3 = FALSE; 
+      targetLoc0 = FALSE;
+     Serial.printf("targetPos 1%i\n", targetLoc1);
     }
-   else if(measure.RangeMilliMeter > 75 && measure.RangeMilliMeter <= 150){
-      targetLoc2 =TRUE;
-      targetLoc1 =FALSE; targetLoc3 =FALSE; targetLoc0 =FALSE;
-      Serial.printf("targetPos 2%i\n", targetLoc2);
+   else if(measure.RangeMilliMeter > 70 && measure.RangeMilliMeter < 140){
+      targetLoc2 = TRUE;
+      targetLoc1 = FALSE; 
+      targetLoc3 = FALSE; 
+      targetLoc0 = FALSE;
+     Serial.printf("targetPos 2%i\n", targetLoc2);
     }
-   else if(measure.RangeMilliMeter > 150 && measure.RangeMilliMeter <= 225){
-      targetLoc3 =TRUE;
-      targetLoc1 =FALSE; targetLoc2 =FALSE; targetLoc0 =FALSE;
-      Serial.printf("targetPos 3%i\n", targetLoc3);
+   else if(measure.RangeMilliMeter > 140 && measure.RangeMilliMeter < 220){
+      targetLoc3 = TRUE;
+      targetLoc1 = FALSE; 
+      targetLoc2 = FALSE; 
+      targetLoc0 = FALSE;
+     Serial.printf("targetPos 3%i\n", targetLoc3);
     }
   } else {
-    targetLoc0 =TRUE;
-    targetLoc1 =FALSE; targetLoc2 =FALSE; targetLoc3 =FALSE;  
+    targetLoc0 = TRUE;
+    targetLoc1 = FALSE; 
+    targetLoc2 = FALSE; 
+    targetLoc3 = FALSE;  
     Serial.printf("targetPos 0%i\n", targetLoc0);
-  } delay(500);
+  } startime = millis();
 }
 
 void pumpOn (int waterPumpPin) { // Water Pump OnOff function with serial print values
