@@ -1,7 +1,7 @@
 /* 
  * Project JP VL53LOX test
  * Author: JP Funk
- * Date: 04/15/2024 Monday Build of TOF Functionality w/ 3 LEDs
+ * Date: 04/18/2024 Thursda Build of TOF Functionality w/ 3 LEDs MP3 Player integration
  * For comprehensive documentation and examples, please visit:
  * https://docs.particle.io/firmware/best-practices/firmware-template/
  */
@@ -28,16 +28,14 @@ const int OLED_RESET=-1;
 int rot;
 Adafruit_VL53L0X lox = Adafruit_VL53L0X();
 int TOF;
-int targetLoc1, targetLoc2, targetLoc3, targetLoc0, prevTargetLoc1, prevTargetLoc2, prevTargetLoc3;
+int targetLoc1, targetLoc2, targetLoc3, targetLoc4, targetLoc0, prevTargetLoc1, prevTargetLoc2, prevTargetLoc3, prevTargetLoc4;
 bool position;
 unsigned int rangeTime = 500;
 // Button
 //const int BUTTONPIN = D3;
 void buttonisClicked();
 bool changed;
-bool ledOnOff;
-bool ledOnOff2;
-bool ledOnOff3;
+bool ledOnOff, ledOnOff2, ledOnOff3, ledOnOff4;
 //void ledOn (int waterPumpPin);
 const int LEDPIN = D6; // LED pin  for TOF Location 1 Water Pump
 const int PUMPIN = D6;
@@ -46,7 +44,7 @@ const int LEDPIN3 = D4; // LED pin for TOF Location 3
 
 void pumpOn (int waterPumpPin);
 // Millis Timer
-const int sampleTime = 1000; //3000
+const int sampleTime = 500; //3000
 unsigned int duration, startTime;
 // Adafruit BME
 Adafruit_BME280 bme;
@@ -134,7 +132,8 @@ void loop() {
   VL53L0X_RangingMeasurementData_t measure;
 
   lox.rangingTest(&measure, false); // pass in 'true' to get debug data printout!
-if ((millis()-startTime) > sampleTime)
+
+if ((millis()-startTime) > sampleTime) // TOF Level 2 Range 0-50mm
   if (targetLoc1 != prevTargetLoc1){
   Serial.printf("%i\n", position);
   startTime = millis();
@@ -145,7 +144,7 @@ if ((millis()-startTime) > sampleTime)
       Serial.printf("LED1%i\n", targetLoc1); 
     }
 
-if ((millis()-startTime) > sampleTime)
+if ((millis()-startTime) > sampleTime) // TOF Level 2 Range 5-115mm
   if (targetLoc2 != prevTargetLoc2){
   Serial.printf("%i\n", position);
    if (targetLoc2 == TRUE){
@@ -153,12 +152,16 @@ if ((millis()-startTime) > sampleTime)
       } prevTargetLoc2 = targetLoc2;
       digitalWrite(LEDPIN2, ledOnOff2);
       Serial.printf("Next Song\n");
-      myDFPlayer.next();
+      (ledOnOff2 = TRUE); 
+       myDFPlayer.next();
+      if (ledOnOff2 = FALSE ){
+        myDFPlayer.stop();
+        }
       Serial.printf("LED2 On%i\n",targetLoc2);
-       startTime = millis();
+      startTime = millis();
     }
 
-if ((millis()-startTime) > sampleTime)
+if ((millis()-startTime) > sampleTime) // TOF Level 3 Range 135-185mm
   if (targetLoc3 != prevTargetLoc3){
   Serial.printf("%i\n", position);
    if (targetLoc3 == TRUE){
@@ -168,34 +171,60 @@ if ((millis()-startTime) > sampleTime)
       Serial.printf("LED3 On%i\n", targetLoc3);
        startTime = millis();
     }
-
-  if (measure.RangeStatus != 4) {  // phase failures have incorrect data
+if ((millis()-startTime) > sampleTime) // TOF Level 4 Range Volume Up/Down 200-280mm
+  if (targetLoc4 != prevTargetLoc4){
+  Serial.printf("%i\n", position);
+   if (targetLoc4 == TRUE){
+      ledOnOff4= !ledOnOff4;
+      } prevTargetLoc4= targetLoc4;
+      //digitalWrite(LEDPIN3, ledOnOff4); 
+       myDFPlayer.volumeUp();
+      if (ledOnOff4 = FALSE ){
+        myDFPlayer.volumeDown();
+        Serial.printf("Vol DN%i\n", ledOnOff4);
+        }
+      Serial.printf("MP3 Vol%i\n", targetLoc4);
+       startTime = millis();
+    }
+  if (measure.RangeStatus != 5) {  // phase failures have incorrect data
     if(measure.RangeMilliMeter <= 50){ //70
       targetLoc1 = TRUE;
       targetLoc2 = FALSE;
       targetLoc3 = FALSE; 
       targetLoc0 = FALSE;
+      targetLoc4 = FALSE;
      Serial.printf("targetPos 1%i\n", targetLoc1);
     }
-   else if(measure.RangeMilliMeter > 65 && measure.RangeMilliMeter < 115){
+   else if(measure.RangeMilliMeter > 60 && measure.RangeMilliMeter < 120){
       targetLoc2 = TRUE;
       targetLoc1 = FALSE; 
       targetLoc3 = FALSE; 
       targetLoc0 = FALSE;
+      targetLoc4 = FALSE;
      Serial.printf("targetPos 2%i\n", targetLoc2);
     }
-   else if(measure.RangeMilliMeter > 135 && measure.RangeMilliMeter < 185){
+   else if(measure.RangeMilliMeter > 130 && measure.RangeMilliMeter < 190){
       targetLoc3 = TRUE;
       targetLoc1 = FALSE; 
       targetLoc2 = FALSE; 
       targetLoc0 = FALSE;
+      targetLoc4 = FALSE;
      Serial.printf("targetPos 3%i\n", targetLoc3);
     }
+    else if(measure.RangeMilliMeter > 200 && measure.RangeMilliMeter < 300){
+      targetLoc4 = TRUE;
+      targetLoc3 = FALSE; //
+      targetLoc1 = FALSE; 
+      targetLoc2 = FALSE; 
+      targetLoc0 = FALSE;
+    Serial.printf("targetPos 4%i\n", targetLoc4);
+  }
   } else {
     targetLoc0 = TRUE;
     targetLoc1 = FALSE; 
     targetLoc2 = FALSE; 
-    targetLoc3 = FALSE;  
+    targetLoc3 = FALSE; 
+    targetLoc4 = FALSE; 
     Serial.printf("targetPos 0%i\n", targetLoc0);
   }
 }
