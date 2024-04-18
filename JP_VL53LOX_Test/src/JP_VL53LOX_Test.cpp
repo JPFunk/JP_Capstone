@@ -16,12 +16,19 @@
 #include "Button.h"
 #include "IotClassroom_CNM.h"
 #include "IoTTimer.h"
+#include "DFRobotDFPlayerMini.h"
+
+// DFRobotMP3Player
+DFRobotDFPlayerMini myDFPlayer;
+Button nextButton(D0);
+unsigned int lastSong;
+void printDetail(uint8_t type, int value);
 // OLED
 const int OLED_RESET=-1;
 int rot;
 Adafruit_VL53L0X lox = Adafruit_VL53L0X();
 int TOF;
-int targetLoc1, targetLoc2, targetLoc3, targetLoc0, prevTargetLoc;
+int targetLoc1, targetLoc2, targetLoc3, targetLoc0, prevTargetLoc1, prevTargetLoc2, prevTargetLoc3;
 bool position;
 unsigned int rangeTime = 500;
 // Button
@@ -68,7 +75,8 @@ SerialLogHandler logHandler(LOG_LEVEL_INFO);
 void setup() {
   waitFor(Serial.isConnected, 5000);
   Serial.begin(115200);
-
+  Serial1.begin(9600);
+  delay(1000);
 //intialize OLED display
 display.begin(SSD1306_SWITCHCAPVCC, 0x3C);
 display.display();
@@ -104,6 +112,19 @@ pinMode (LEDPIN, OUTPUT);
 pinMode (LEDPIN2, OUTPUT);
 pinMode (LEDPIN3, OUTPUT);
 pinMode (PUMPIN, OUTPUT);
+//DFRobotMP3Player
+  if (!myDFPlayer.begin(Serial1)) {  //Use softwareSerial to communicate with mp3.
+    Serial.printf("Unable to begin:\n");
+    Serial.printf("1.Please recheck the connection!\n");
+    Serial.printf("2.Please insert the SD card!\n");
+    while(true);
+  }
+  Serial.printf("DFPlayer Mini online.\n");
+  
+  myDFPlayer.volume(30);  //Set volume value. From 0 to 30
+  myDFPlayer.loop(1);  //Play the first mp3
+  myDFPlayer.enableLoopAll();
+
 // Millis Startime
 startTime = millis();
 //startTime = 0;
@@ -114,55 +135,56 @@ void loop() {
 
   lox.rangingTest(&measure, false); // pass in 'true' to get debug data printout!
 if ((millis()-startTime) > sampleTime)
-  if (targetLoc1 != prevTargetLoc){
+  if (targetLoc1 != prevTargetLoc1){
   Serial.printf("%i\n", position);
   startTime = millis();
    if (targetLoc1 == TRUE) {
       ledOnOff= !ledOnOff;
-      } prevTargetLoc = targetLoc1;
+      } prevTargetLoc1 = targetLoc1;
       digitalWrite(LEDPIN, ledOnOff);
-      Serial.printf("LED1%i\n", targetLoc1);
-       
+      Serial.printf("LED1%i\n", targetLoc1); 
     }
 
 if ((millis()-startTime) > sampleTime)
-  if (targetLoc2 != prevTargetLoc){
+  if (targetLoc2 != prevTargetLoc2){
   Serial.printf("%i\n", position);
    if (targetLoc2 == TRUE){
       ledOnOff2= !ledOnOff2;
-      } prevTargetLoc = targetLoc2;
+      } prevTargetLoc2 = targetLoc2;
       digitalWrite(LEDPIN2, ledOnOff2);
+      Serial.printf("Next Song\n");
+      myDFPlayer.next();
       Serial.printf("LED2 On%i\n",targetLoc2);
        startTime = millis();
     }
 
 if ((millis()-startTime) > sampleTime)
-  if (targetLoc3 != prevTargetLoc){
+  if (targetLoc3 != prevTargetLoc3){
   Serial.printf("%i\n", position);
    if (targetLoc3 == TRUE){
       ledOnOff3= !ledOnOff3;
-      } prevTargetLoc = targetLoc3;
+      } prevTargetLoc3= targetLoc3;
       digitalWrite(LEDPIN3, ledOnOff3);
       Serial.printf("LED3 On%i\n", targetLoc3);
        startTime = millis();
     }
 
   if (measure.RangeStatus != 4) {  // phase failures have incorrect data
-    if(measure.RangeMilliMeter <= 70){
+    if(measure.RangeMilliMeter <= 50){ //70
       targetLoc1 = TRUE;
       targetLoc2 = FALSE;
       targetLoc3 = FALSE; 
       targetLoc0 = FALSE;
      Serial.printf("targetPos 1%i\n", targetLoc1);
     }
-   else if(measure.RangeMilliMeter > 70 && measure.RangeMilliMeter < 140){
+   else if(measure.RangeMilliMeter > 65 && measure.RangeMilliMeter < 115){
       targetLoc2 = TRUE;
       targetLoc1 = FALSE; 
       targetLoc3 = FALSE; 
       targetLoc0 = FALSE;
      Serial.printf("targetPos 2%i\n", targetLoc2);
     }
-   else if(measure.RangeMilliMeter > 140 && measure.RangeMilliMeter < 220){
+   else if(measure.RangeMilliMeter > 135 && measure.RangeMilliMeter < 185){
       targetLoc3 = TRUE;
       targetLoc1 = FALSE; 
       targetLoc2 = FALSE; 
@@ -175,7 +197,7 @@ if ((millis()-startTime) > sampleTime)
     targetLoc2 = FALSE; 
     targetLoc3 = FALSE;  
     Serial.printf("targetPos 0%i\n", targetLoc0);
-  } startime = millis();
+  }
 }
 
 void pumpOn (int waterPumpPin) { // Water Pump OnOff function with serial print values
@@ -188,6 +210,61 @@ void pumpOn (int waterPumpPin) { // Water Pump OnOff function with serial print 
   digitalWrite(waterPumpPin, LOW);
   display.display();
  // delay (3000);
+}
+void printDetail(uint8_t type, int value){
+  switch (type) {
+    case TimeOut:
+      Serial.println(F("Time Out!"));
+      break;
+    case WrongStack:
+      Serial.println(F("Stack Wrong!"));
+      break;
+    case DFPlayerCardInserted:
+      Serial.println(F("Card Inserted!"));
+      break;
+    case DFPlayerCardRemoved:
+      Serial.println(F("Card Removed!"));
+      break;
+    case DFPlayerCardOnline:
+      Serial.println(F("Card Online!"));
+      break;
+    case DFPlayerPlayFinished:
+      Serial.print(F("Number:"));
+      Serial.print(value);
+      Serial.println(F(" Play Finished!"));
+      break;
+    case DFPlayerError:
+      Serial.print(F("DFPlayerError:"));
+      switch (value) {
+        case Busy:
+          Serial.println(F("Card not found"));
+          break;
+        case Sleeping:
+          Serial.println(F("Sleeping"));
+          break;
+        case SerialWrongStack:
+          Serial.println(F("Get Wrong Stack"));
+          break;
+        case CheckSumNotMatch:
+          Serial.println(F("Check Sum Not Match"));
+          break;
+        case FileIndexOut:
+          Serial.println(F("File Index Out of Bound"));
+          break;
+        case FileMismatch:
+          Serial.println(F("Cannot Find File"));
+          break;
+        case Advertise:
+          Serial.println(F("In Advertise"));
+          break;
+        default:
+          break;
+      }
+      break;
+    default:
+      break;
+  }
+
 }
   // TOF Measure Range Status code
   // if (measure.RangeStatus != 4) {  // phase failures have incorrect data
