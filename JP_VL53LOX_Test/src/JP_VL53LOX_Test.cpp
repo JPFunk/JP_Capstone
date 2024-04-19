@@ -1,7 +1,7 @@
 /* 
  * Project JP VL53LOX test
  * Author: JP Funk
- * Date: 04/18/2024 Thursda Build of TOF Functionality w/ 3 LEDs MP3 Player integration
+ * Date: 04/19/2024 Friday Build of TOF Functionality w/ 3 LEDs MP3 Player Volume integration, Started Neopixels
  * For comprehensive documentation and examples, please visit:
  * https://docs.particle.io/firmware/best-practices/firmware-template/
  */
@@ -17,7 +17,8 @@
 #include "IotClassroom_CNM.h"
 #include "IoTTimer.h"
 #include "DFRobotDFPlayerMini.h"
-
+#include "Neopixel.h"
+#include "Colors.h"
 // DFRobotMP3Player
 DFRobotDFPlayerMini myDFPlayer;
 Button nextButton(D0);
@@ -28,19 +29,33 @@ const int OLED_RESET=-1;
 int rot;
 Adafruit_VL53L0X lox = Adafruit_VL53L0X();
 int TOF;
-int targetLoc1, targetLoc2, targetLoc3, targetLoc4, targetLoc0, prevTargetLoc1, prevTargetLoc2, prevTargetLoc3, prevTargetLoc4;
+int targetLoc0, targetLoc1, targetLoc2, targetLoc3, targetLoc4, targetLoc5; 
+int prevTargetLoc1, prevTargetLoc2, prevTargetLoc3, prevTargetLoc4, prevTargetLoc5;
 bool position;
-unsigned int rangeTime = 500;
+unsigned int rangeTime = 1000;
+int modeSeq, modeVol, preVol;
+const int volumeTime = 100; //3000
 // Button
 //const int BUTTONPIN = D3;
 void buttonisClicked();
 bool changed;
-bool ledOnOff, ledOnOff2, ledOnOff3, ledOnOff4;
+bool ledOnOff, ledOnOff2, ledOnOff3, ledOnOff4, ledOnOff5;
 //void ledOn (int waterPumpPin);
 const int LEDPIN = D6; // LED pin  for TOF Location 1 Water Pump
 const int PUMPIN = D6;
 const int LEDPIN2 = D5; // LED pin for TOF Location 2
 const int LEDPIN3 = D4; // LED pin for TOF Location 3
+
+// Neopixel
+const int PIXELCOUNT = 12; // Total number of NeoPixels
+// const int maxRange = 82;
+// const int minRange = 72;
+Adafruit_NeoPixel pixel(PIXELCOUNT, SPI1, WS2812B); // declare object
+int pixelAddr ;
+int range1, range2, range3, range4, range5;
+void pixelFill(int start, int end, int color);
+int colorCount;
+int i;
 
 void pumpOn (int waterPumpPin);
 // Millis Timer
@@ -86,7 +101,7 @@ display.setCursor(0,0);
 display.clearDisplay();
 delay(1000);
   
-  Wire.begin();
+  Wire.begin(); // ToF start sequence
 
   if (!lox.begin()) {
     Serial.println(F("Failed to boot VL53L0X"));
@@ -110,6 +125,21 @@ pinMode (LEDPIN, OUTPUT);
 pinMode (LEDPIN2, OUTPUT);
 pinMode (LEDPIN3, OUTPUT);
 pinMode (PUMPIN, OUTPUT);
+//Neopixel display
+ pixel.begin ();
+ pixel.setBrightness (64); // bri is a value 0 - 255
+ pixel.show (); // initialize all off
+
+ // NeoPixel Set Up----------------------------------------------------------------
+pixel.begin ();
+pixel.setBrightness (64); // bri is a value 0 - 255
+pixel.clear ();
+pixel.show (); // initialize all off
+colorCount=0;
+pixelAddr=0;
+random (0,4); // LED assignment 0,1,2,3,4
+rainbow[0,1,2,3,4];
+
 //DFRobotMP3Player
   if (!myDFPlayer.begin(Serial1)) {  //Use softwareSerial to communicate with mp3.
     Serial.printf("Unable to begin:\n");
@@ -120,9 +150,9 @@ pinMode (PUMPIN, OUTPUT);
   Serial.printf("DFPlayer Mini online.\n");
   
   myDFPlayer.volume(30);  //Set volume value. From 0 to 30
-  myDFPlayer.loop(1);  //Play the first mp3
+  myDFPlayer.loop(0);  //Play the first mp3
   myDFPlayer.enableLoopAll();
-
+  myDFPlayer.volume(modeVol);
 // Millis Startime
 startTime = millis();
 //startTime = 0;
@@ -138,11 +168,27 @@ if ((millis()-startTime) > sampleTime) // TOF Level 2 Range 0-50mm
   Serial.printf("%i\n", position);
   startTime = millis();
    if (targetLoc1 == TRUE) {
-      ledOnOff= !ledOnOff;
-      } prevTargetLoc1 = targetLoc1;
+    ledOnOff= !ledOnOff;
+   }  prevTargetLoc1 = targetLoc1;
       digitalWrite(LEDPIN, ledOnOff);
-      Serial.printf("LED1%i\n", targetLoc1); 
+      Serial.printf("LED1%i\n", targetLoc1);
+      startTime = millis();
     }
+
+//targetLoc1 to Neopixel functions
+// if ((millis()-startTime) > sampleTime)
+// if (targetLoc1 != prevTargetLoc1){
+//   if (targetLoc1 = range1){
+//     for (pixelAddr =0; pixelAddr <PIXELCOUNT; pixelAddr++) {
+//       pixel.setPixelColor (pixelAddr, rainbow[i]);
+//       delay(20); // needs to be turned on for NeoStrip SetPixelColor assignment
+//       }
+//       pixel.show (); // nothing changes until show ()
+//       i++;
+//     if (i>6){i=0;}
+//      startTime = millis();
+//   }
+// }
 
 if ((millis()-startTime) > sampleTime) // TOF Level 2 Range 5-115mm
   if (targetLoc2 != prevTargetLoc2){
@@ -150,15 +196,9 @@ if ((millis()-startTime) > sampleTime) // TOF Level 2 Range 5-115mm
    if (targetLoc2 == TRUE){
       ledOnOff2= !ledOnOff2;
       } prevTargetLoc2 = targetLoc2;
-      digitalWrite(LEDPIN2, ledOnOff2);
-      Serial.printf("Next Song\n");
-      (ledOnOff2 = TRUE); 
-       myDFPlayer.next();
-      if (ledOnOff2 = FALSE ){
-        myDFPlayer.stop();
-        }
-      Serial.printf("LED2 On%i\n",targetLoc2);
-      startTime = millis();
+        digitalWrite(LEDPIN2, ledOnOff2);
+        Serial.printf("LED2 On%i\n",targetLoc2);
+        startTime = millis();
     }
 
 if ((millis()-startTime) > sampleTime) // TOF Level 3 Range 135-185mm
@@ -168,65 +208,128 @@ if ((millis()-startTime) > sampleTime) // TOF Level 3 Range 135-185mm
       ledOnOff3= !ledOnOff3;
       } prevTargetLoc3= targetLoc3;
       digitalWrite(LEDPIN3, ledOnOff3);
+      myDFPlayer.next();
+      Serial.printf("Next Song\n");
       Serial.printf("LED3 On%i\n", targetLoc3);
-       startTime = millis();
-    }
-if ((millis()-startTime) > sampleTime) // TOF Level 4 Range Volume Up/Down 200-280mm
-  if (targetLoc4 != prevTargetLoc4){
-  Serial.printf("%i\n", position);
-   if (targetLoc4 == TRUE){
-      ledOnOff4= !ledOnOff4;
-      } prevTargetLoc4= targetLoc4;
-      //digitalWrite(LEDPIN3, ledOnOff4); 
-       myDFPlayer.volumeUp();
-      if (ledOnOff4 = FALSE ){
+      startTime = millis();
+  } else {
+    if ((millis()-startTime) > sampleTime)
+      if (targetLoc3 != prevTargetLoc3){
+       if (targetLoc3 == TRUE){
+         ledOnOff3= !ledOnOff3;
+       }  prevTargetLoc3= targetLoc3;
+          digitalWrite(LEDPIN3, ledOnOff3);
+          myDFPlayer.stop();
+          Serial.printf("Stop\n");
+          Serial.printf("LED3 On%i\n", targetLoc3);
+          startTime = millis();
+      }
+  }
+    //TOF Volume Code
+    if ((millis()-startTime) > volumeTime)
+      if (targetLoc4 != prevTargetLoc4) {
+        myDFPlayer.volumeUp();
+        modeVol = myDFPlayer.readVolume();
+        Serial.printf("MP3 Vol DN%i\n", targetLoc4);
+        startTime = millis();
+      }
+
+    if ((millis()-startTime) > volumeTime)
+      if (targetLoc5 != prevTargetLoc5) {
         myDFPlayer.volumeDown();
-        Serial.printf("Vol DN%i\n", ledOnOff4);
-        }
-      Serial.printf("MP3 Vol%i\n", targetLoc4);
-       startTime = millis();
-    }
-  if (measure.RangeStatus != 5) {  // phase failures have incorrect data
-    if(measure.RangeMilliMeter <= 50){ //70
+        myDFPlayer.readVolume();
+        Serial.printf("MP3 Vol DN%i\n", targetLoc5);
+        startTime = millis();
+      }
+
+  if (measure.RangeStatus != 6) {  // phase failures have incorrect data
+    if(measure.RangeMilliMeter <= 30){ //70
       targetLoc1 = TRUE;
       targetLoc2 = FALSE;
       targetLoc3 = FALSE; 
-      targetLoc0 = FALSE;
       targetLoc4 = FALSE;
+      targetLoc5 = FALSE;
+      targetLoc0 = FALSE;
      Serial.printf("targetPos 1%i\n", targetLoc1);
     }
-   else if(measure.RangeMilliMeter > 60 && measure.RangeMilliMeter < 120){
+   else if(measure.RangeMilliMeter > 50 && measure.RangeMilliMeter < 110){
       targetLoc2 = TRUE;
       targetLoc1 = FALSE; 
       targetLoc3 = FALSE; 
-      targetLoc0 = FALSE;
       targetLoc4 = FALSE;
+      targetLoc5 = FALSE;
+      targetLoc0 = FALSE;
      Serial.printf("targetPos 2%i\n", targetLoc2);
     }
-   else if(measure.RangeMilliMeter > 130 && measure.RangeMilliMeter < 190){
+   else if(measure.RangeMilliMeter > 125 && measure.RangeMilliMeter < 180){
       targetLoc3 = TRUE;
       targetLoc1 = FALSE; 
       targetLoc2 = FALSE; 
-      targetLoc0 = FALSE;
       targetLoc4 = FALSE;
+      targetLoc5 = FALSE;
+      targetLoc0 = FALSE;
      Serial.printf("targetPos 3%i\n", targetLoc3);
     }
-    else if(measure.RangeMilliMeter > 200 && measure.RangeMilliMeter < 300){
+    else if(measure.RangeMilliMeter > 200 && measure.RangeMilliMeter < 240){
       targetLoc4 = TRUE;
-      targetLoc3 = FALSE; //
       targetLoc1 = FALSE; 
       targetLoc2 = FALSE; 
+      targetLoc3 = FALSE;
+      targetLoc5 = FALSE;
       targetLoc0 = FALSE;
     Serial.printf("targetPos 4%i\n", targetLoc4);
+  }
+    else if(measure.RangeMilliMeter > 260 && measure.RangeMilliMeter < 300){
+      targetLoc5 = TRUE;
+      targetLoc1 = FALSE; 
+      targetLoc2 = FALSE;
+      targetLoc3 = FALSE; 
+      targetLoc4 = FALSE; 
+      targetLoc0 = FALSE;
+    Serial.printf("targetPos 5%i\n", targetLoc5);
   }
   } else {
     targetLoc0 = TRUE;
     targetLoc1 = FALSE; 
     targetLoc2 = FALSE; 
     targetLoc3 = FALSE; 
-    targetLoc4 = FALSE; 
+    targetLoc4 = FALSE;
+    targetLoc5 = FALSE;
     Serial.printf("targetPos 0%i\n", targetLoc0);
   }
+
+}
+
+
+//targetLoc2 to Neopixel functions
+ //targetLoc2 = range2;
+ // range2 = pixelAddr; // = map (range,0,10,0,4);
+  // if (pixelAddr >= 9){
+  // pixelAddr = 9;
+  // } 
+  // if (pixelAddr<=4){
+  // pixelAddr = 4;
+  // }
+  // pixelFill(16, pixelAddr, 0xFFFF00);
+
+//targetLoc3 to Neopixel functions
+  //  range3 = targetLoc3;
+  // pixelAddr = map (range3,11,16);  //pixelAddr = map (range,0,10,0,4);
+  // if (pixelAddr >= 15){
+  // pixelAddr = 15;
+  // } 
+  // if (pixelAddr<=10){
+  // pixelAddr = 10;
+  // }
+  // pixelFill(10, pixelAddr, 0x00FF00);
+//}
+
+void pixelFill(int start, int end, int color) {
+ int i;
+ for (i=start; i<=end; i++){
+ pixel.setPixelColor (i, color); // hexadecimal color
+ }
+  pixel.show (); // nothing changes until show ()
 }
 
 void pumpOn (int waterPumpPin) { // Water Pump OnOff function with serial print values
