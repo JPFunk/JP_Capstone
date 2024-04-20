@@ -1,7 +1,7 @@
 /* 
  * Project JP VL53LOX test
  * Author: JP Funk
- * Date: 04/19/2024 Friday Build of TOF Functionality w/ 3 LEDs MP3 Player Volume integration, Started Neopixels
+ * Date: 04/20/2024 Friday Build of TOF Functionality w/ 3 LEDs MP3 Player Volume, Neopixels, Change & Stop tracks
  * For comprehensive documentation and examples, please visit:
  * https://docs.particle.io/firmware/best-practices/firmware-template/
  */
@@ -23,7 +23,6 @@
 DFRobotDFPlayerMini myDFPlayer;
 Button nextButton(D0);
 unsigned int lastSong;
-void printDetail(uint8_t type, int value);
 // OLED
 const int OLED_RESET=-1;
 int rot;
@@ -187,30 +186,26 @@ if ((millis()-startTime) > sampleTime) // TOF Level 2 Neopixel Range 5-115mm
         startTime = millis();
     }
 
-if ((millis()-startTime) > sampleTime) // TOF Level 3 MP3 Next Range 135-185mm
+// TOF Level 3 MP3 Next Range 135-185mm
+if ((millis()-startTime) > sampleTime)
   if (targetLoc3 != prevTargetLoc3){
-  Serial.printf("%i\n", position);
-   if (targetLoc3 == TRUE){
-      ledOnOff3= !ledOnOff3;
+    Serial.printf("%i\n", position);
+    if (targetLoc3 = TRUE){
+       ledOnOff3= !ledOnOff3;
       } prevTargetLoc3= targetLoc3;
-      digitalWrite(LEDPIN3, ledOnOff3);
-      myDFPlayer.next();
-      Serial.printf("Next Song\n");
-      Serial.printf("LED3 On%i\n", targetLoc3);
-      startTime = millis();
-  } 
-
-    if ((millis()-startTime) > sampleTime)  // TOF Level 3 MP3 Stop Range 135-185mm
-      if (targetLoc3 != prevTargetLoc3){
-       if (targetLoc3 == TRUE){
-         ledOnOff3= !ledOnOff3;
-        }  prevTargetLoc3= targetLoc3;
-          digitalWrite(LEDPIN3, ledOnOff3);
-          myDFPlayer.stop();
-          Serial.printf("Stop\n");
-          Serial.printf("LED3 On%i\n", targetLoc3);
-          startTime = millis();
-      }
+        digitalWrite(LEDPIN3, ledOnOff3);
+        modeSeq++;
+        Serial.printf("LED3 On%i\n", targetLoc3);
+        startTime = millis();
+    }
+    if (modeSeq%2==1){
+        myDFPlayer.next();
+        Serial.printf("Next Song\n");
+        }
+    if (modeSeq%2==2){
+        myDFPlayer.stop();
+        Serial.printf("Next Song\n");
+        }
     
     //TOF Volume Code
     if ((millis()-startTime) > volumeTime)  // TOF Level 4 Volume Up Range 200-240mm
@@ -305,60 +300,6 @@ void pumpOn (int waterPumpPin) { // Water Pump OnOff function with serial print 
   digitalWrite(waterPumpPin, LOW);
   display.display();
  // delay (3000);
-}
-void printDetail(uint8_t type, int value){
-  switch (type) {
-    case TimeOut:
-      Serial.println(F("Time Out!"));
-      break;
-    case WrongStack:
-      Serial.println(F("Stack Wrong!"));
-      break;
-    case DFPlayerCardInserted:
-      Serial.println(F("Card Inserted!"));
-      break;
-    case DFPlayerCardRemoved:
-      Serial.println(F("Card Removed!"));
-      break;
-    case DFPlayerCardOnline:
-      Serial.println(F("Card Online!"));
-      break;
-    case DFPlayerPlayFinished:
-      Serial.print(F("Number:"));
-      Serial.print(value);
-      Serial.println(F(" Play Finished!"));
-      break;
-    case DFPlayerError:
-      Serial.print(F("DFPlayerError:"));
-      switch (value) {
-        case Busy:
-          Serial.println(F("Card not found"));
-          break;
-        case Sleeping:
-          Serial.println(F("Sleeping"));
-          break;
-        case SerialWrongStack:
-          Serial.println(F("Get Wrong Stack"));
-          break;
-        case CheckSumNotMatch:
-          Serial.println(F("Check Sum Not Match"));
-          break;
-        case FileIndexOut:
-          Serial.println(F("File Index Out of Bound"));
-          break;
-        case FileMismatch:
-          Serial.println(F("Cannot Find File"));
-          break;
-        case Advertise:
-          Serial.println(F("In Advertise"));
-          break;
-        default:
-          break;
-      }
-      break;
-    default:
-      break;
-  }
 }
 
 void targetRange() { // Neopixel activation with TOF Ranges
