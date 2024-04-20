@@ -35,7 +35,7 @@ bool position;
 unsigned int rangeTime = 1000;
 int modeSeq, modeVol, preVol;
 const int volumeTime = 100; //3000
-// Button
+
 //const int BUTTONPIN = D3;
 void buttonisClicked();
 bool changed;
@@ -54,9 +54,9 @@ Adafruit_NeoPixel pixel(PIXELCOUNT, SPI1, WS2812B); // declare object
 int pixelAddr ;
 int range1, range2, range3, range4, range5;
 void pixelFill(int start, int end, int color);
-int colorCount;
+int colorCount, color;
 int i;
-
+void targetRange();
 void pumpOn (int waterPumpPin);
 // Millis Timer
 const int sampleTime = 500; //3000
@@ -159,11 +159,12 @@ startTime = millis();
 }
 // loop() runs over and over again, as quickly as it can execute.
 void loop() {
-  VL53L0X_RangingMeasurementData_t measure;
 
-  lox.rangingTest(&measure, false); // pass in 'true' to get debug data printout!
+VL53L0X_RangingMeasurementData_t measure;
+lox.rangingTest(&measure, false); // pass in 'true' to get debug data printout!
+targetRange(); // Neopixel VOID function int for target ranges
 
-if ((millis()-startTime) > sampleTime) // TOF Level 2 Range 0-50mm
+if ((millis()-startTime) > sampleTime) // TOF Level 1 Water Pump Range 0-50mm
   if (targetLoc1 != prevTargetLoc1){
   Serial.printf("%i\n", position);
   startTime = millis();
@@ -175,22 +176,7 @@ if ((millis()-startTime) > sampleTime) // TOF Level 2 Range 0-50mm
       startTime = millis();
     }
 
-//targetLoc1 to Neopixel functions
-// if ((millis()-startTime) > sampleTime)
-// if (targetLoc1 != prevTargetLoc1){
-//   if (targetLoc1 = range1){
-//     for (pixelAddr =0; pixelAddr <PIXELCOUNT; pixelAddr++) {
-//       pixel.setPixelColor (pixelAddr, rainbow[i]);
-//       delay(20); // needs to be turned on for NeoStrip SetPixelColor assignment
-//       }
-//       pixel.show (); // nothing changes until show ()
-//       i++;
-//     if (i>6){i=0;}
-//      startTime = millis();
-//   }
-// }
-
-if ((millis()-startTime) > sampleTime) // TOF Level 2 Range 5-115mm
+if ((millis()-startTime) > sampleTime) // TOF Level 2 Neopixel Range 5-115mm
   if (targetLoc2 != prevTargetLoc2){
   Serial.printf("%i\n", position);
    if (targetLoc2 == TRUE){
@@ -201,7 +187,7 @@ if ((millis()-startTime) > sampleTime) // TOF Level 2 Range 5-115mm
         startTime = millis();
     }
 
-if ((millis()-startTime) > sampleTime) // TOF Level 3 Range 135-185mm
+if ((millis()-startTime) > sampleTime) // TOF Level 3 MP3 Next Range 135-185mm
   if (targetLoc3 != prevTargetLoc3){
   Serial.printf("%i\n", position);
    if (targetLoc3 == TRUE){
@@ -212,29 +198,30 @@ if ((millis()-startTime) > sampleTime) // TOF Level 3 Range 135-185mm
       Serial.printf("Next Song\n");
       Serial.printf("LED3 On%i\n", targetLoc3);
       startTime = millis();
-  } else {
-    if ((millis()-startTime) > sampleTime)
+  } 
+
+    if ((millis()-startTime) > sampleTime)  // TOF Level 3 MP3 Stop Range 135-185mm
       if (targetLoc3 != prevTargetLoc3){
        if (targetLoc3 == TRUE){
          ledOnOff3= !ledOnOff3;
-       }  prevTargetLoc3= targetLoc3;
+        }  prevTargetLoc3= targetLoc3;
           digitalWrite(LEDPIN3, ledOnOff3);
           myDFPlayer.stop();
           Serial.printf("Stop\n");
           Serial.printf("LED3 On%i\n", targetLoc3);
           startTime = millis();
       }
-  }
+    
     //TOF Volume Code
-    if ((millis()-startTime) > volumeTime)
+    if ((millis()-startTime) > volumeTime)  // TOF Level 4 Volume Up Range 200-240mm
       if (targetLoc4 != prevTargetLoc4) {
         myDFPlayer.volumeUp();
-        modeVol = myDFPlayer.readVolume();
+        myDFPlayer.readVolume();
         Serial.printf("MP3 Vol DN%i\n", targetLoc4);
         startTime = millis();
       }
 
-    if ((millis()-startTime) > volumeTime)
+    if ((millis()-startTime) > volumeTime)  // TOF Level 5 Volume Dn Range 260-300mm
       if (targetLoc5 != prevTargetLoc5) {
         myDFPlayer.volumeDown();
         myDFPlayer.readVolume();
@@ -242,7 +229,7 @@ if ((millis()-startTime) > sampleTime) // TOF Level 3 Range 135-185mm
         startTime = millis();
       }
 
-  if (measure.RangeStatus != 6) {  // phase failures have incorrect data
+if (measure.RangeStatus != 6) {  // phase failures have incorrect data
     if(measure.RangeMilliMeter <= 30){ //70
       targetLoc1 = TRUE;
       targetLoc2 = FALSE;
@@ -297,33 +284,9 @@ if ((millis()-startTime) > sampleTime) // TOF Level 3 Range 135-185mm
     targetLoc5 = FALSE;
     Serial.printf("targetPos 0%i\n", targetLoc0);
   }
-
 }
 
-
-//targetLoc2 to Neopixel functions
- //targetLoc2 = range2;
- // range2 = pixelAddr; // = map (range,0,10,0,4);
-  // if (pixelAddr >= 9){
-  // pixelAddr = 9;
-  // } 
-  // if (pixelAddr<=4){
-  // pixelAddr = 4;
-  // }
-  // pixelFill(16, pixelAddr, 0xFFFF00);
-
-//targetLoc3 to Neopixel functions
-  //  range3 = targetLoc3;
-  // pixelAddr = map (range3,11,16);  //pixelAddr = map (range,0,10,0,4);
-  // if (pixelAddr >= 15){
-  // pixelAddr = 15;
-  // } 
-  // if (pixelAddr<=10){
-  // pixelAddr = 10;
-  // }
-  // pixelFill(10, pixelAddr, 0x00FF00);
-//}
-
+// VOID Functions 
 void pixelFill(int start, int end, int color) {
  int i;
  for (i=start; i<=end; i++){
@@ -396,23 +359,28 @@ void printDetail(uint8_t type, int value){
     default:
       break;
   }
-
 }
-  // TOF Measure Range Status code
-  // if (measure.RangeStatus != 4) {  // phase failures have incorrect data
-  //     display.clearDisplay();
-  //     display.setCursor(0,0);
-  //     display.setTextSize(3);
-  //     display.print(measure.RangeMilliMeter);
-  //     display.print("mm");
-  //     display.display();
-  //     Serial.println();
-  //     delay(50);
-  // } else {
-  //   display.clearDisplay();
-  //   display.setCursor(0,0);
-  //   display.setTextSize(3);
-  //   display.print("Out of Range");
-  //   display.display();
-  //   return;
-  // }
+
+void targetRange() { // Neopixel activation with TOF Ranges
+   if(range1 = targetLoc1){ // Neopixel TOF location 1 Pump
+    pixelFill (0,11,red);
+      pixel.show();
+  }
+  if(range2 = targetLoc2){  // Neopixel TOF location 1 Neopixel Crystal Ball selection
+    pixelFill (0,11,yellow);
+      pixel.show();
+  }
+   if(range3 = targetLoc3){  // Neopixel TOF location 3  MP3 Tracks
+    pixelFill (0,11,blue);
+      pixel.show();
+  }
+  if(range4 = targetLoc4){  // Neopixel TOF location 4 MP3 Volume Up
+    pixelFill (0,11,cyan);
+      pixel.show();
+  }
+   if(range5 = targetLoc5){  // Neopixel TOF location 5 MP3 Volume Downn
+    pixelFill (0,11,violet);
+      pixel.show();
+  }
+  pixel.clear();
+}
