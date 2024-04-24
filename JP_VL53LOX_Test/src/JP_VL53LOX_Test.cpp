@@ -181,8 +181,7 @@ void loop() {
         } 
         else {
         digitalWrite (PUMPIN, LOW);
-        Serial.printf("Stop\n");
-        Serial.printf("Button is not pressed \n");
+        Serial.printf("Pump OFF \n");
         }
         startTime = millis();
     }
@@ -278,43 +277,46 @@ if ((millis()-startTime) > sampleTime) // TOF Level 2 Neopixel Range 5-115mm
         startTime = millis();
     }
 //if ((millis()-startTime) > sampleTime)  // TOF Level 3 MP3 Next Range 135-185mm
-//if (targetLoc2 != prevTargetLoc2)
+//if (targetLoc2 != prevTargetLoc2);
 
  // TOF if/else for DFRobot MP3 player tarck oand off modes
-  // if (targetLoc2 == TRUE){
-  // Serial.printf("%i\n", position);
-  // startStop = !startStop;
-  // if (startStop == TRUE){
-  //      // digitalWrite(LEDPIN3, ledOnOff3);
-  //      // myDFPlayer.loop(1),(track%3+1);
-  //       myDFPlayer.play((track%3)+1);
-  //       Serial.printf("MP3 On%i\n",targetLoc2);
-  //      } else {
-  //         myDFPlayer.stop();
-  //         Serial.printf("MP3 Off%i\n",targetLoc2);
-  //         track++;
-  //         }
-  //     //prevTargetLoc2 = targetLoc2;
-  // }
-    //TOF track select Volume Code
-    if ((millis()-startTime) > volumeTime)   // TOF Level 2 Neopixel Range 50-115mm
-      if (targetLoc2 != prevTargetLoc2) {
-         myDFPlayer.next();
-         Serial.printf("MP3 On%i\n",targetLoc2);
-         startTime = millis();
-      }
-
-    if ((millis()-startTime) > volumeTime)   // TOF Level 3 MP3 Next Range 135-185mm
-      if (targetLoc3 != prevTargetLoc3) {
+  if (targetLoc2 == TRUE){
+  Serial.printf("%i\n", position);
+  startStop = !startStop;
+  if (startStop){  // (startStop == TRUE)
+       // digitalWrite(LEDPIN3, ledOnOff3);
+       // myDFPlayer.loop(1),(track%3+1);
+        // myDFPlayer.play((track%3)+1);
+        myDFPlayer.play(track%3+1);
+        Serial.printf("MP3 On%i\n",targetLoc2);
+       } else {
           myDFPlayer.stop();
-          Serial.printf("MP3 Off%i\n",targetLoc3);
-          startTime = millis();
-      }
+          Serial.printf("MP3 Off%i\n",targetLoc2);
+          track++;
+          }
+      //prevTargetLoc2 = targetLoc2;
+  }
+
+    //TOF track select Volume Code
+    // if ((millis()-startTime) > volumeTime)   // TOF Level 2 Neopixel Range 50-115mm
+    //   if (targetLoc2 != prevTargetLoc2) {
+    //      myDFPlayer.next();
+    //      Serial.printf("MP3 On%i\n",targetLoc2);
+    //      startTime = millis();
+    //   }
+
+    // if ((millis()-startTime) > volumeTime)   // TOF Level 3 MP3 Next Range 135-185mm
+    //   if (targetLoc3 != prevTargetLoc3) {
+    //       myDFPlayer.stop();
+    //       Serial.printf("MP3 Off%i\n",targetLoc3);
+    //       startTime = millis();
+    //   }
+
     //TOF Volume Code
     if ((millis()-startTime) > volumeTime)  // TOF Level 4 Volume Up Range 200-240mm
       if (targetLoc4 != prevTargetLoc4) {
         myDFPlayer.volumeUp();
-        Serial.printf("MP3 Vol DN%i\n", targetLoc4);
+        Serial.printf("MP3 Vol UP%i\n", targetLoc4);
         startTime = millis();
       }
 
