@@ -1,7 +1,7 @@
 /* 
  * Project JP VL53LOX test
  * Author: JP Funk
- * Date: 04/20/2024 Friday Build of TOF Functionality w/ 3 LEDs MP3 Player Volume, Neopixels, Change & Stop tracks
+ * Date: 04/23/2024 Tuesday Build of TOF Functionality w/ 3 LEDs MP3 Player Volume integration, Neopixels, water pump
  * For comprehensive documentation and examples, please visit:
  * https://docs.particle.io/firmware/best-practices/firmware-template/
  */
@@ -23,6 +23,11 @@
 DFRobotDFPlayerMini myDFPlayer;
 Button nextButton(D0);
 unsigned int lastSong;
+bool startStop;
+int track;
+int trackSeq, trackVol, preVol;
+const int volumeTime = 100; //3000
+
 // OLED
 const int OLED_RESET=-1;
 int rot;
@@ -32,16 +37,16 @@ int targetLoc0, targetLoc1, targetLoc2, targetLoc3, targetLoc4, targetLoc5;
 int prevTargetLoc1, prevTargetLoc2, prevTargetLoc3, prevTargetLoc4, prevTargetLoc5;
 bool position;
 unsigned int rangeTime = 1000;
-int modeSeq, modeVol, preVol;
-const int volumeTime = 100; //3000
 
 //const int BUTTONPIN = D3;
 void buttonisClicked();
-bool changed;
+bool changed, buttonState, buttonState1;
 bool ledOnOff, ledOnOff2, ledOnOff3, ledOnOff4, ledOnOff5;
+// const int PUMPBUTTON = D3; // Touch Sensor
+Button PUMPBUTTON (D3);
+const int buttonTime = 500; //3000
 //void ledOn (int waterPumpPin);
 const int LEDPIN = D6; // LED pin  for TOF Location 1 Water Pump
-const int PUMPIN = D6;
 const int LEDPIN2 = D5; // LED pin for TOF Location 2
 const int LEDPIN3 = D4; // LED pin for TOF Location 3
 
@@ -56,7 +61,13 @@ void pixelFill(int start, int end, int color);
 int colorCount, color;
 int i;
 void targetRange();
-void pumpOn (int waterPumpPin);
+// Water Pump
+//void pumpOn (int waterPumpPin);
+const int PUMPDELAY = (1000);
+const int PUMPIN = D7;
+unsigned int last, lastTime;
+float  pubValue;
+int subValue;
 // Millis Timer
 const int sampleTime = 500; //3000
 unsigned int duration, startTime;
@@ -89,6 +100,8 @@ void setup() {
   Serial.begin(115200);
   Serial1.begin(9600);
   delay(1000);
+// Pump sensor Button
+
 //intialize OLED display
 display.begin(SSD1306_SWITCHCAPVCC, 0x3C);
 display.display();
@@ -118,7 +131,7 @@ delay(1000);
   // power 
   Serial.println(F("VL53L0X API Simple Ranging example\n\n"));
 // Button
-//pinMode(BUTTONPIN, INPUT);
+//pinMode (PUMPBUTTON, INPUT);
 // LED
 pinMode (LEDPIN, OUTPUT);
 pinMode (LEDPIN2, OUTPUT);
@@ -151,79 +164,32 @@ rainbow[0,1,2,3,4];
   myDFPlayer.volume(30);  //Set volume value. From 0 to 30
   myDFPlayer.loop(0);  //Play the first mp3
   myDFPlayer.enableLoopAll();
-  myDFPlayer.volume(modeVol);
+  myDFPlayer.volume(trackVol);
 // Millis Startime
 startTime = millis();
 //startTime = 0;
 }
 // loop() runs over and over again, as quickly as it can execute.
 void loop() {
-
+ // Pump Button
+  if ((millis()-startTime) > buttonTime) 
+    if(PUMPBUTTON.isPressed()) {
+      startStop =!startStop;
+      if (startStop) {
+        digitalWrite (PUMPIN, HIGH);
+        Serial.printf("Pump Button On\n");
+        } 
+        else {
+        digitalWrite (PUMPIN, LOW);
+        Serial.printf("Stop\n");
+        Serial.printf("Button is not pressed \n");
+        }
+        startTime = millis();
+    }
+// TOF Ranging functions
 VL53L0X_RangingMeasurementData_t measure;
 lox.rangingTest(&measure, false); // pass in 'true' to get debug data printout!
 targetRange(); // Neopixel VOID function int for target ranges
-
-if ((millis()-startTime) > sampleTime) // TOF Level 1 Water Pump Range 0-50mm
-  if (targetLoc1 != prevTargetLoc1){
-  Serial.printf("%i\n", position);
-  startTime = millis();
-   if (targetLoc1 == TRUE) {
-    ledOnOff= !ledOnOff;
-   }  prevTargetLoc1 = targetLoc1;
-      digitalWrite(LEDPIN, ledOnOff);
-      Serial.printf("LED1%i\n", targetLoc1);
-      startTime = millis();
-    }
-
-if ((millis()-startTime) > sampleTime) // TOF Level 2 Neopixel Range 5-115mm
-  if (targetLoc2 != prevTargetLoc2){
-  Serial.printf("%i\n", position);
-   if (targetLoc2 == TRUE){
-      ledOnOff2= !ledOnOff2;
-      } prevTargetLoc2 = targetLoc2;
-        digitalWrite(LEDPIN2, ledOnOff2);
-        Serial.printf("LED2 On%i\n",targetLoc2);
-        startTime = millis();
-    }
-
-// TOF Level 3 MP3 Next Range 135-185mm
-if ((millis()-startTime) > sampleTime)
-  if (targetLoc3 != prevTargetLoc3){
-    Serial.printf("%i\n", position);
-    if (targetLoc3 = TRUE){
-       ledOnOff3= !ledOnOff3;
-      } prevTargetLoc3= targetLoc3;
-        digitalWrite(LEDPIN3, ledOnOff3);
-        modeSeq++;
-        Serial.printf("LED3 On%i\n", targetLoc3);
-        startTime = millis();
-    }
-    if (modeSeq%2==1){
-        myDFPlayer.next();
-        Serial.printf("Next Song\n");
-        }
-    if (modeSeq%2==2){
-        myDFPlayer.stop();
-        Serial.printf("Next Song\n");
-        }
-    
-    //TOF Volume Code
-    if ((millis()-startTime) > volumeTime)  // TOF Level 4 Volume Up Range 200-240mm
-      if (targetLoc4 != prevTargetLoc4) {
-        myDFPlayer.volumeUp();
-        myDFPlayer.readVolume();
-        Serial.printf("MP3 Vol DN%i\n", targetLoc4);
-        startTime = millis();
-      }
-
-    if ((millis()-startTime) > volumeTime)  // TOF Level 5 Volume Dn Range 260-300mm
-      if (targetLoc5 != prevTargetLoc5) {
-        myDFPlayer.volumeDown();
-        myDFPlayer.readVolume();
-        Serial.printf("MP3 Vol DN%i\n", targetLoc5);
-        startTime = millis();
-      }
-
 if (measure.RangeStatus != 6) {  // phase failures have incorrect data
     if(measure.RangeMilliMeter <= 30){ //70
       targetLoc1 = TRUE;
@@ -279,6 +245,85 @@ if (measure.RangeStatus != 6) {  // phase failures have incorrect data
     targetLoc5 = FALSE;
     Serial.printf("targetPos 0%i\n", targetLoc0);
   }
+
+if ((millis()-startTime) > sampleTime) // TOF Level 2 Neopixel Range 5-115mm
+  if (targetLoc1 != prevTargetLoc1){
+  Serial.printf("%i\n", position);
+   if (targetLoc1 == TRUE){
+      ledOnOff= !ledOnOff;
+      } prevTargetLoc1 = targetLoc1;
+        digitalWrite(LEDPIN, ledOnOff);
+        Serial.printf("Red LED On\n",targetLoc1);
+        startTime = millis();
+    }
+
+if ((millis()-startTime) > sampleTime) // TOF Level 2 Neopixel Range 5-115mm
+  if (targetLoc2 != prevTargetLoc2){
+  Serial.printf("%i\n", position);
+   if (targetLoc2 == TRUE){
+      ledOnOff2= !ledOnOff2;
+      } prevTargetLoc2 = targetLoc2;
+        digitalWrite(LEDPIN2, ledOnOff2);
+        Serial.printf("LED2 On%i, MP3 Next\n",targetLoc2);
+        startTime = millis();
+    }
+if ((millis()-startTime) > sampleTime) // TOF Level 2 Neopixel Range 5-115mm
+  if (targetLoc3 != prevTargetLoc3){
+  Serial.printf("%i\n", position);
+   if (targetLoc3 == TRUE){
+      ledOnOff3= !ledOnOff3;
+      } prevTargetLoc3 = targetLoc3;
+        digitalWrite(LEDPIN3, ledOnOff3);
+        Serial.printf("LED3 On%i, MP3 Stop\n",targetLoc3);
+        startTime = millis();
+    }
+//if ((millis()-startTime) > sampleTime)  // TOF Level 3 MP3 Next Range 135-185mm
+//if (targetLoc2 != prevTargetLoc2)
+
+ // TOF if/else for DFRobot MP3 player tarck oand off modes
+  // if (targetLoc2 == TRUE){
+  // Serial.printf("%i\n", position);
+  // startStop = !startStop;
+  // if (startStop == TRUE){
+  //      // digitalWrite(LEDPIN3, ledOnOff3);
+  //      // myDFPlayer.loop(1),(track%3+1);
+  //       myDFPlayer.play((track%3)+1);
+  //       Serial.printf("MP3 On%i\n",targetLoc2);
+  //      } else {
+  //         myDFPlayer.stop();
+  //         Serial.printf("MP3 Off%i\n",targetLoc2);
+  //         track++;
+  //         }
+  //     //prevTargetLoc2 = targetLoc2;
+  // }
+    //TOF track select Volume Code
+    if ((millis()-startTime) > volumeTime)   // TOF Level 2 Neopixel Range 50-115mm
+      if (targetLoc2 != prevTargetLoc2) {
+         myDFPlayer.next();
+         Serial.printf("MP3 On%i\n",targetLoc2);
+         startTime = millis();
+      }
+
+    if ((millis()-startTime) > volumeTime)   // TOF Level 3 MP3 Next Range 135-185mm
+      if (targetLoc3 != prevTargetLoc3) {
+          myDFPlayer.stop();
+          Serial.printf("MP3 Off%i\n",targetLoc3);
+          startTime = millis();
+      }
+    //TOF Volume Code
+    if ((millis()-startTime) > volumeTime)  // TOF Level 4 Volume Up Range 200-240mm
+      if (targetLoc4 != prevTargetLoc4) {
+        myDFPlayer.volumeUp();
+        Serial.printf("MP3 Vol DN%i\n", targetLoc4);
+        startTime = millis();
+      }
+
+    if ((millis()-startTime) > volumeTime)  // TOF Level 5 Volume Dn Range 260-300mm
+      if (targetLoc5 != prevTargetLoc5) {
+        myDFPlayer.volumeDown();
+        Serial.printf("MP3 Vol DN%i\n", targetLoc5);
+        startTime = millis();
+      }
 }
 
 // VOID Functions 
@@ -288,18 +333,6 @@ void pixelFill(int start, int end, int color) {
  pixel.setPixelColor (i, color); // hexadecimal color
  }
   pixel.show (); // nothing changes until show ()
-}
-
-void pumpOn (int waterPumpPin) { // Water Pump OnOff function with serial print values
-  digitalWrite(waterPumpPin, HIGH);
-  Serial.printf("Pump On%i\n", pumpOn);
-  display.clearDisplay();
-  display.setCursor(0,0);
-  display.setTextSize(2);
-  display.printf(" Pump !On!", pumpOn);
-  digitalWrite(waterPumpPin, LOW);
-  display.display();
- // delay (3000);
 }
 
 void targetRange() { // Neopixel activation with TOF Ranges
