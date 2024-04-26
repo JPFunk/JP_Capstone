@@ -1,7 +1,7 @@
 /* 
  * Project JP VL53LOX test
  * Author: JP Funk
- * Date: 04/24/2024 Wednesday Build of TOF MP3 Player Volume integration, Neopixels, water pump
+ * Date: 04/25/2024 Thursday Build of TOF MP3 Player + Volume , Neopixels, water pump, NeoPixelRing
  * For comprehensive documentation and examples, please visit:
  * https://docs.particle.io/firmware/best-practices/firmware-template/
  */
@@ -19,22 +19,24 @@
 #include "DFRobotDFPlayerMini.h"
 #include "Neopixel.h"
 #include "Colors.h"
-// DFRobotMP3Player
+
+
+// DFRobotMP3 Player
 DFRobotDFPlayerMini myDFPlayer;
 Button nextButton(D0);
 unsigned int lastSong;
 bool startStop;
+bool volOnOff;
 int track;
-int trackSeq, trackVol, preVol;
-const int volumeTime = 100; //3000
+const int volumeTime = 300; //3000
 
-// TOF
+// TOF VL53LOX Sensor
 Adafruit_VL53L0X lox = Adafruit_VL53L0X();
 int TOF;
-bool targetLoc0, targetLoc1, targetLoc2, targetLoc3, targetLoc4, targetLoc5; 
-bool prevTargetLoc1, prevTargetLoc2, prevTargetLoc3, prevTargetLoc4, prevTargetLoc5;
+bool targetLoc0, targetLoc1, targetLoc2, targetLoc3;
+bool prevTargetLoc1, prevTargetLoc2, prevTargetLoc3;
 bool position;
-unsigned int rangeTime = 1000;
+unsigned int rangeTime = 500;
 
 //const int BUTTONPIN = D3;
 void buttonisClicked();
@@ -45,20 +47,17 @@ Button PUMPBUTTON (D3);
 const int buttonTime = 500; //3000
 // LED Pins
 const int LEDPIN = D6; // LED pin  for TOF Location 1 Water Pump
-const int LEDPIN2 = D5; // LED pin for TOF Location 2
-const int LEDPIN3 = D4; // LED pin for TOF Location 3
-bool ledOnOff, ledOnOff2, ledOnOff3, ledOnOff4, ledOnOff5;
+// const int LEDPIN2 = D5; // LED pin for TOF Location 2
+// const int LEDPIN3 = D4; // LED pin for TOF Location 3
+// bool ledOnOff, ledOnOff2, ledOnOff3;
 
 // Neopixel
-const int PIXELCOUNT = 12; // Total number of NeoPixels
-// const int maxRange = 82;
-// const int minRange = 72;
-Adafruit_NeoPixel pixel(PIXELCOUNT, SPI1, WS2812B); // declare object
-int pixelAddr ;
+const int PIXELCOUNT = 4; // Total number of single NeoPixels
+int i, pixelAddr ;
+bool neoOnOff;
 void pixelFill(int start, int end, int color);
-int colorCount, color;
-int i;
 void targetRange();
+Adafruit_NeoPixel pixel(PIXELCOUNT, SPI1, WS2812B); // declare object
 
 // Water Pump
 const int PUMPIN = D7;
@@ -78,6 +77,18 @@ float tempC, pressPA, humidRH, tempF, inHG;
 // Let Device OS manage the connection to the Particle Cloud
 SYSTEM_MODE(SEMI_AUTOMATIC);
 
+// NeoPixel Ring
+#if (PLATFORM_ID == 32)
+#define PIXEL_PIN SPI
+#else // #if (PLATFORM_ID == 32)
+#define PIXEL_PIN D15
+#endif
+#define PIXEL_COUNT 12
+#define PIXEL_TYPE WS2812B
+
+Adafruit_NeoPixel strip(PIXEL_COUNT, PIXEL_PIN, PIXEL_TYPE);
+void rainbowRing(uint8_t wait);
+uint32_t Wheel(byte WheelPos);
 // Run the application and system concurrently in separate threads
 SYSTEM_THREAD(ENABLED);
 
@@ -113,18 +124,13 @@ void setup() {
 pinMode (PUMPIN, OUTPUT);
 // LED
 pinMode (LEDPIN, OUTPUT);
-pinMode (LEDPIN2, OUTPUT);
-pinMode (LEDPIN3, OUTPUT);
+// pinMode (LEDPIN2, OUTPUT);
+// pinMode (LEDPIN3, OUTPUT);
 
  // NeoPixel Set Up----------------------------------------------------------------
 pixel.begin ();
 pixel.setBrightness (64); // bri is a value 0 - 255
-pixel.clear ();
 pixel.show (); // initialize all off
-colorCount=0;
-pixelAddr=0;
-random (0,4); // LED assignment 0,1,2,3,4
-rainbow[0,1,2,3,4];
 
 //DFRobotMP3Player
   if (!myDFPlayer.begin(Serial1)) {  //Use softwareSerial to communicate with mp3.
@@ -136,28 +142,27 @@ rainbow[0,1,2,3,4];
   Serial.printf("DFPlayer Mini online.\n");
   myDFPlayer.volume(15);  //Set volume value. From 0 to 30
   myDFPlayer.loop(0);  //Play the first mp3
-  myDFPlayer.enableLoopAll();
-  //myDFPlayer.volume(trackVol);
 // Millis Startime
 startTime = millis();
 //startTime = 0;
 }
-// loop() runs over and over again, as quickly as it can execute.
+
 void loop() {
  // Pump Button
-  if ((millis()-startTime) > buttonTime) 
-    if(PUMPBUTTON.isPressed()) {
-      buttonState =!buttonState;
-      if (buttonState) {
-        digitalWrite (PUMPIN, HIGH);
-        Serial.printf("Pump Button On\n");
-        } 
-        else {
-        digitalWrite (PUMPIN, LOW);
-        Serial.printf("Pump OFF \n");
-        }
-        startTime = millis();
-    }
+if ((millis()-startTime) > buttonTime) 
+  if(PUMPBUTTON.isPressed()) {
+    buttonState =!buttonState;
+    if (buttonState) {
+      digitalWrite (PUMPIN, HIGH);
+      Serial.printf("Pump Button On\n");
+      } 
+      else {
+      digitalWrite (PUMPIN, LOW);
+      Serial.printf("Pump OFF \n");
+      }
+      startTime = millis();
+  }
+
 // TOF Ranging functions
 VL53L0X_RangingMeasurementData_t measure;
 lox.rangingTest(&measure, false); // pass in 'true' to get debug data printout!
@@ -192,16 +197,36 @@ if (measure.RangeStatus != 4) {  // phase failures have incorrect data
       Serial.printf("targetPos 0%i\n", targetLoc0);
   }
 }
+
 if ((millis()-startTime) > sampleTime) // TOF Level 1 Neopixel Range 0-100mm
   if (targetLoc1 != prevTargetLoc1){
   Serial.printf("%i\n", position);
     if (targetLoc1 == TRUE){
-      ledOnOff= !ledOnOff;
+      neoOnOff= !neoOnOff;
       } prevTargetLoc1 = targetLoc1;
-        digitalWrite(LEDPIN, ledOnOff);
+        digitalWrite(LEDPIN, neoOnOff);
         Serial.printf("Red LED On\n",targetLoc1);
         startTime = millis();
     }
+
+  //  rainbowRing(20); // NeoPixel Rainbow Ring function
+  
+// if ((millis()-startTime) > sampleTime) // TOF Level 1 Neopixel Range 0-100mm
+//   if (targetLoc1 != prevTargetLoc1){
+//     if (targetLoc1 == TRUE){
+//       neoOnOff= !neoOnOff;
+//        if (neoOnOff) {
+//         rainbowRing(20);
+//         Serial.printf("Neo Ring On%i\n",targetLoc1);
+//         } else {
+//         rainbowRing(20);
+//         Serial.printf("Neo Ring Off%i\n",targetLoc1);
+//         pixel.clear();
+//         }
+//       }
+//     }
+//     startTime = millis();
+//     prevTargetLoc1 = targetLoc1;
 
 if ((millis()-startTime) > sampleTime)  // TOF Level 2 MP3 Next Range 100-200mm
   if (targetLoc2 != prevTargetLoc2) {
@@ -212,34 +237,32 @@ if ((millis()-startTime) > sampleTime)  // TOF Level 2 MP3 Next Range 100-200mm
         myDFPlayer.play(track%3+1);
       // myDFPlayer.loop(0);  
         Serial.printf("MP3 On%i\n",targetLoc2);
-        startTime = millis();
           } else {
           myDFPlayer.stop();
           Serial.printf("MP3 Off%i\n",targetLoc2);
           track++;
-          startTime = millis();
           }
         }
+        startTime = millis();
       }
-        prevTargetLoc2 = targetLoc2;
+      prevTargetLoc2 = targetLoc2;
 
 if ((millis()-startTime) > sampleTime)  // TOF Level 3 MP3 Volume Range 200-300mm
   if (targetLoc3 != prevTargetLoc3) {
     if (targetLoc3 == TRUE){
       Serial.printf("%i,%i\n", targetLoc3, prevTargetLoc3);
-      startStop = !startStop;
-      if (startStop){
-        myDFPlayer.volume(20);
+      volOnOff = !volOnOff;
+      if (volOnOff){
+        myDFPlayer.volume(30);
         Serial.printf("Volume On%i\n",targetLoc3);
-        startTime = millis();
         } else {
           myDFPlayer.volume(0);
           Serial.printf("Volume Off%i\n",targetLoc3);
-          startTime = millis();
         }  
-      }  pixel.clear();
+      }
+      startTime = millis(); 
     }
-      prevTargetLoc3 = targetLoc3;
+    prevTargetLoc3 = targetLoc3;
 }
 
 // VOID Functions Neopixel
@@ -252,27 +275,58 @@ void pixelFill(int start, int end, int color) {
 }
  // Neopixel activation with TOF Ranges
 void targetRange() {
-   if(targetLoc1){
-    pixelFill (0,11,red);
-      pixel.show();
+if(targetLoc1){   // Neopixel TOF location 1  NeoPixel Ring OnOFF
+  if (startStop){
+  pixelFill (0,3,green);
   }
-  if(targetLoc2){   // Neopixel TOF location 2  MP3 Tracks OnOFF
-    if (startStop){
-    pixelFill (0,11,turquoise);
-    }
-    else {
-      pixelFill (0,11,yellow);
-    }
-      pixel.show();
+  else {
+  pixelFill (0,3,red);
   }
-   if(targetLoc3){  // Neopixel TOF location 3  MP3 Volume OnOFF
-    if (startStop){
-    pixelFill (0,11,green);
-    }
-    else {
-      pixelFill (0,11,purple);
-    }
-      pixel.show();
+  pixel.show();
+}
+
+if(targetLoc2){   // Neopixel TOF location 2  MP3 Tracks OnOFF
+  if (startStop){
+  pixelFill (0,3,turquoise);
   }
-  pixel.clear();
+  else {
+  pixelFill (0,3,magenta);
+  }
+  pixel.show();
+}
+
+if(targetLoc3){  // Neopixel TOF location 3  MP3 Volume OnOFF
+  if (startStop){
+  pixelFill (0,3,blue);
+  }
+  else {
+  pixelFill (0,3,yellow);
+  }
+  pixel.show();
+}
+pixel.clear();
+}
+
+// Rainbow Ring Neopixel Function for Crystal Ball
+void rainbowRing(uint8_t wait) {
+  uint16_t k, j;
+  for(j=0; j<256; j++) {
+    for(k=0; k<strip.numPixels(); k++) {
+      strip.setPixelColor(k, Wheel((k+j) & 255));
+    }
+    strip.show();
+    delay(wait);
+  }
+}
+
+uint32_t Wheel(byte WheelPos) {
+  if(WheelPos < 85) {
+   return strip.Color(WheelPos * 3, 255 - WheelPos * 3, 0);
+  } else if(WheelPos < 170) {
+   WheelPos -= 85;
+   return strip.Color(255 - WheelPos * 3, 0, WheelPos * 3);
+  } else {
+   WheelPos -= 170;
+   return strip.Color(0, WheelPos * 3, 255 - WheelPos * 3);
+  }
 }
