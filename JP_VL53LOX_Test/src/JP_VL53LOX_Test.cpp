@@ -1,7 +1,7 @@
 /* 
  * Project JP VL53LOX test
  * Author: JP Funk
- * Date: 04/26/2024 Friday Morning of TOF MP3 Player + Volume , Neopixels, water pump, NeoPixelRing
+ * Date: 05/03/2024 Friday 5pm push- minor code update, physical model water pump and pumbing fixes
  * For comprehensive documentation and examples, please visit:
  * https://docs.particle.io/firmware/best-practices/firmware-template/
  */
@@ -10,8 +10,6 @@
 #include "Particle.h"
 #include "Adafruit_VL53L0X.h"
 #include <SPI.h>
-#include <Adafruit_GFX.h>
-#include <Adafruit_SSD1306.h>
 #include "Adafruit_BME280.h"
 #include "Button.h"
 #include "IotClassroom_CNM.h"
@@ -38,7 +36,7 @@ bool prevTargetLoc1, prevTargetLoc2, prevTargetLoc3;
 bool position;
 unsigned int rangeTime = 500;
 
-//const int BUTTONPIN = D3;
+const int BUTTONPIN = D3;
 void buttonisClicked();
 bool changed, buttonState;
 
@@ -47,9 +45,6 @@ Button PUMPBUTTON (D3);
 const int buttonTime = 500; //3000
 // LED Pins
 const int LEDPIN = D6; // LED pin  for TOF Location 1 Water Pump
-// const int LEDPIN2 = D5; // LED pin for TOF Location 2
-// const int LEDPIN3 = D4; // LED pin for TOF Location 3
-// bool ledOnOff, ledOnOff2, ledOnOff3;
 
 // Neopixel
 const int PIXELCOUNT = 4; // Total number of single NeoPixels
@@ -57,8 +52,8 @@ int i, pixelAddr ;
 bool neoOnOff;
 void pixelFill(int start, int end, int color);
 void targetRange();
-Adafruit_NeoPixel pixel(PIXELCOUNT, SPI1, WS2812B); // declare object
-
+//Adafruit_NeoPixel pixel(PIXELCOUNT, SPI1, WS2812B); // declare object
+Adafruit_NeoPixel pixel(PIXELCOUNT, D2, WS2812B); // declare object
 // Water Pump
 const int PUMPIN = D7;
 float  pubValue;
@@ -86,8 +81,8 @@ SYSTEM_MODE(SEMI_AUTOMATIC);
 // #endif
 const int PIXEL_COUNT = 12;
 //#define PIXEL_TYPE WS2812B
-
-Adafruit_NeoPixel strip(PIXEL_COUNT, SPI, WS2812B);
+//Adafruit_NeoPixel strip(PIXEL_COUNT, SPI, WS2812B); for Photon 2
+Adafruit_NeoPixel strip(PIXEL_COUNT, D12, WS2812B);
 void rainbowRing(uint8_t wait);
 uint32_t Wheel(byte WheelPos);
 // Run the application and system concurrently in separate threads
@@ -121,6 +116,7 @@ void setup() {
   }
   // power 
   Serial.println(F("VL53L0X API Simple Ranging example\n\n"));
+  
 //Pump Pin
 pinMode (PUMPIN, OUTPUT);
 // LED
@@ -152,20 +148,18 @@ startTime = millis();
 
 void loop() {
  // Pump Button
-if ((millis()-startTime) > buttonTime){ 
-  if(PUMPBUTTON.isPressed()) {
+  if(PUMPBUTTON.isClicked()) {
     buttonState =!buttonState;
-    if (buttonState) {
-      digitalWrite (PUMPIN, HIGH);
-      Serial.printf("Pump Button On\n");
-      } 
-      else {
-      digitalWrite (PUMPIN, LOW);
-      Serial.printf("Pump OFF \n");
-      }
-      startTime = millis();
   }
-}
+  if (buttonState) {
+    digitalWrite (PUMPIN, HIGH);
+    Serial.printf("Pump Button On\n");
+    } 
+    else {
+    digitalWrite (PUMPIN, LOW);
+    Serial.printf("Pump OFF \n");
+    }
+
 // TOF Ranging functions
 VL53L0X_RangingMeasurementData_t measure;
 lox.rangingTest(&measure, false); // pass in 'true' to get debug data printout!
@@ -213,7 +207,7 @@ if (measure.RangeStatus != 4) {  // phase failures have incorrect data
 //     }
 //   }
 
-if ((millis()-startTime) > sampleTime){ // TOF Level 1 Neopixel Range 0-100mm
+// TOF Level 1 Neopixel Range 0-100mm
   if (targetLoc1 != prevTargetLoc1){
     if (targetLoc1 == TRUE){
       neoOnOff= !neoOnOff;
@@ -227,10 +221,8 @@ if ((millis()-startTime) > sampleTime){ // TOF Level 1 Neopixel Range 0-100mm
         strip.show();
         }
       }
-       startTime = millis();
     }
     prevTargetLoc1 = targetLoc1;
-}
 
 if ((millis()-startTime) > sampleTime){  // TOF Level 2 MP3 Next Range 100-200mm
   if (targetLoc2 != prevTargetLoc2) {
@@ -279,7 +271,6 @@ void pixelFill(int start, int end, int color) {
 }
  // Neopixel activation with TOF Ranges
 void targetRange() {
-if ((millis()-startTime) > sampleTime) // new code for pixel targetloc
 if(targetLoc1){   // Neopixel TOF location 1  NeoPixel Ring OnOFF
   if (startStop){
   pixelFill (0,3,red);
@@ -317,7 +308,7 @@ pixel.clear();
 
 // Rainbow Ring Neopixel Function for Crystal Ball
 void rainbowRing(uint8_t pixelTime) {
-  if ((millis()-startTime) > pixelTime){
+ if ((millis()-startTime) > pixelTime){
   uint16_t k, j;
   for(j=0; j<256; j++) {
     for(k=0; k<strip.numPixels(); k++) {
