@@ -1,7 +1,7 @@
 /* 
  * Project JP VL53LOX test
  * Author: JP Funk
- * Date: 05/05/2024 Sunday- minor code update, Wiring finished- still issues
+ * Date: 05/06/2024 MOnday- still working on TOF bugs
  * For comprehensive documentation and examples, please visit:
  * https://docs.particle.io/firmware/best-practices/firmware-template/
  */
@@ -34,7 +34,7 @@ int TOF;
 bool targetLoc0, targetLoc1, targetLoc2, targetLoc3;
 bool prevTargetLoc1, prevTargetLoc2, prevTargetLoc3;
 bool position;
-unsigned int rangeTime = 500;
+unsigned int rangeTime = 250;
 
 const int BUTTONPIN = D3;
 void buttonisClicked();
@@ -42,7 +42,6 @@ bool changed, buttonState;
 
 // Touch Sensor
 Button PUMPBUTTON (D3);
-const int buttonTime = 500; //3000
 // LED Pins
 const int LEDPIN = D6; // LED pin  for TOF Location 1 Water Pump
 
@@ -59,7 +58,8 @@ const int PUMPIN = D7;
 float  pubValue;
 int subValue;
 // Millis Timer
-const int sampleTime = 500; //3000
+const int buttonTime = 250; //3000
+const int sampleTime = 250; //3000
 const int pixelTime = 20; //3000
 unsigned int duration, startTime;
 // Adafruit BME
@@ -152,17 +152,20 @@ void loop() {
  // Pump Button
   if(PUMPBUTTON.isClicked()) {
     buttonState =!buttonState;
-  }
-  if (buttonState) {
-    digitalWrite (PUMPIN, HIGH);
-    pixelFill(4,4, teal);
-    Serial.printf("Pump Button On\n");
-    } 
-    else {
-    digitalWrite (PUMPIN, LOW);
-    pixelFill(4,4, black);
-    Serial.printf("Pump OFF \n");
-    }
+   }
+   //if ((millis()-startTime) > buttonTime){
+    if (buttonState) {
+      digitalWrite (PUMPIN, HIGH);
+      pixelFill(4,4, teal);
+     // Serial.printf("Pump Button On\n");
+      } 
+      else {
+      digitalWrite (PUMPIN, LOW);
+      pixelFill(4,4, black);
+     // Serial.printf("Pump OFF \n");
+      }
+   // startTime = millis();
+   //} Button Millis Bracket
 
 // TOF Ranging functions
 VL53L0X_RangingMeasurementData_t measure;
@@ -176,14 +179,14 @@ if (measure.RangeStatus != 4) {  // phase failures have incorrect data
       targetLoc0 = FALSE;
     // Serial.printf("targetPos 1%i\n", targetLoc1);
     }
-    else if(measure.RangeMilliMeter > 100 && measure.RangeMilliMeter < 180){
+    else if(measure.RangeMilliMeter > 100 && measure.RangeMilliMeter < 180){ // else
       targetLoc2 = TRUE;
       targetLoc1 = FALSE; 
       targetLoc3 = FALSE; 
       targetLoc0 = FALSE;
     // Serial.printf("targetPos 2%i\n", targetLoc2);
     }
-    else if(measure.RangeMilliMeter > 200 && measure.RangeMilliMeter < 300){
+    else if(measure.RangeMilliMeter > 200 && measure.RangeMilliMeter < 300){ // else
       targetLoc3 = TRUE;
       targetLoc1 = FALSE; 
       targetLoc2 = FALSE; 
@@ -195,48 +198,71 @@ if (measure.RangeStatus != 4) {  // phase failures have incorrect data
       targetLoc1 = FALSE; 
       targetLoc2 = FALSE; 
       targetLoc3 = FALSE; 
-      Serial.printf("targetPos 0%i\n", targetLoc0);
+     // Serial.printf("targetPos 0%i\n", targetLoc0);
   }
 }
 
-// TOF Level 1 Neopixel Range 0-100mm
-  if (targetLoc1 != prevTargetLoc1){
-    if (targetLoc1 == TRUE){
-      neoOnOff= !neoOnOff;
-       if (neoOnOff) {
+  // TOF Level 1 Neopixel Range 0-100mm
+  // if (targetLoc1 != prevTargetLoc1){
+  // //((millis()-startTime) > rangeTime);
+  //   if (targetLoc1 == TRUE){
+  //     neoOnOff= !neoOnOff;
+  //      if (neoOnOff) {
+  //       rainbowRing(20);
+  //        strip.show();
+  //       Serial.printf("Neo Ring On%i\n",targetLoc1);
+  //       } else {
+  //       Serial.printf("Neo Ring Off%i\n",targetLoc1);
+  //       strip.clear();
+  //      // strip.show();
+  //       }
+  //     }
+  //   // startTime = millis();
+  //     prevTargetLoc1 = targetLoc1;
+  //   }
+      
+      // TOF Level 1 Neopixel Range 0-100mm
+  if (targetLoc1 ){ /// new code section Monday afgernoon woking with EJ
+  //((millis()-startTime) > rangeTime);
+    //if (targetLoc1 =!targetLoc1){
+        neoOnOff= !neoOnOff;
+        targetLoc1 = FALSE;
+      }   
+        if (neoOnOff) {
         rainbowRing(20);
         Serial.printf("Neo Ring On%i\n",targetLoc1);
         } else {
-        //rainbowRing(20);
         Serial.printf("Neo Ring Off%i\n",targetLoc1);
         strip.clear();
         strip.show();
         }
-      }
-    }
-    prevTargetLoc1 = targetLoc1;
+  
+  
 
  // TOF Level 2 MP3 Next Range 100-200mm
   if (targetLoc2 != prevTargetLoc2) {
+   // ((millis()-startTime) > rangeTime);
     if (targetLoc2 == TRUE){
-      Serial.printf("%i,%i\n", targetLoc2, prevTargetLoc2);
+     // Serial.printf("%i,%i\n", targetLoc2, prevTargetLoc2);
       startStop = !startStop;
       if (startStop){
         myDFPlayer.play(track%3+1);
         Serial.printf("MP3 On%i\n",targetLoc2);
-          myDFPlayer.loop(1); 
-        
+         // myDFPlayer.loop(1); 
           } else {
           myDFPlayer.stop();
           Serial.printf("MP3 Off%i\n",targetLoc2);
           track++;
           }
         }
+     //  startTime = millis(); 
+     prevTargetLoc2 = targetLoc2;
       }
-      prevTargetLoc2 = targetLoc2;
+      
 
- // TOF Level 3 MP3 Volume Range 200-300mm
+   // TOF Level 3 MP3 Volume Range 200-300mm
   if (targetLoc3 != prevTargetLoc3) {
+   // ((millis()-startTime) > rangeTime);
     if (targetLoc3 == TRUE){
       Serial.printf("%i,%i\n", targetLoc3, prevTargetLoc3);
       volOnOff = !volOnOff;
@@ -246,11 +272,14 @@ if (measure.RangeStatus != 4) {  // phase failures have incorrect data
         } else {
           myDFPlayer.volume(0);
           Serial.printf("Volume Off%i\n",targetLoc3);
-        }  
+        } 
       }
-    }
+    // startTime = millis();
     prevTargetLoc3 = targetLoc3;
-}
+    }
+    
+
+} // End Void Loop
 
 // VOID Functions Neopixel
 void pixelFill(int start, int end, int color) {
@@ -264,13 +293,12 @@ void pixelFill(int start, int end, int color) {
  // Neopixel activation with TOF Ranges
 void targetRange() {
   if(targetLoc1){   // Neopixel TOF location 1  NeoPixel Ring OnOFF
-    if (startStop){
-    pixelFill(0,3,red);
-    }
-    else {
+    if (neoOnOff){
     pixelFill(0,3,green);
     }
-    startTime = millis();  // new code for pixel targetloc
+    else {
+    pixelFill(0,3,red);
+    }
     pixel.show();
   }
 
@@ -279,20 +307,18 @@ void targetRange() {
     pixelFill(0,3,turquoise);
     }
     else {
-    pixelFill(0,3,magenta);
+    myDFPlayer.stop();
     }
-    startTime = millis();  // new code for pixel targetloc
     pixel.show();
   }
 
   if(targetLoc3){  // Neopixel TOF location 3  MP3 Volume OnOFF
-    if (startStop){
+    if (volOnOff){
     pixelFill(0,3,blue);
     }
     else {
     pixelFill(0,3,yellow);
     }
-    startTime = millis();  // new code for pixel targetloc
     pixel.show();
   }
 }
