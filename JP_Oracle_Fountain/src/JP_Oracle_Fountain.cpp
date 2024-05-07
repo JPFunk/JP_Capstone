@@ -1,7 +1,7 @@
 /* 
  * Project JP_Oracle_Fountain
  * Author: JP Funk
- * Date: 04/25/2024 Thursday update with Dashboard, reset button & water pump
+ * Date: 07/07/2024 Tuesday update with features working in JP_VL53LOX_Test.cpp
  * For comprehensive documentation and examples, please visit:
  * https://docs.particle.io/firmware/best-practices/firmware-template/
  */
@@ -15,10 +15,30 @@
 #include "Adafruit_MQTT/Adafruit_MQTT_SPARK.h"
 #include "Adafruit_MQTT/Adafruit_MQTT.h"
 #include "Adafruit_BME280.h"
+#include "DFRobotDFPlayerMini.h"
 #include "IoTClassroom_CNM.h"
 #include "IoTTimer.h"
 #include "math.h"
 #include "Button.h"
+#include "neopixel.h"
+#include "Colors.h"
+
+// DFRobotMP3 Player
+DFRobotDFPlayerMini myDFPlayer;
+Button nextButton(D0);
+unsigned int lastSong;
+bool startStop;
+bool volOnOff;
+int track;
+const int volumeTime = 300; //3000
+
+// TOF VL53LOX Sensor
+Adafruit_VL53L0X lox = Adafruit_VL53L0X();
+int TOF;
+bool targetLoc0, targetLoc1, targetLoc2, targetLoc3;
+bool prevTargetLoc1, prevTargetLoc2, prevTargetLoc3;
+bool position;
+unsigned int rangeTime = 250;
 
 // Reset Button
 int8_t RST;
@@ -31,15 +51,27 @@ bool changed, buttonState;
 
 // Touch Sensor
 Button PUMPBUTTON (D3);
-const int buttonTime = 500; //3000
+// const int buttonTime = 500; //3000 old needs to be removed once other code is working
+
+// Neopixel
+const int PIXELCOUNT = 5; // Total number of single NeoPixels
+int i, pixelAddr, colorCount;
+bool neoOnOff, blackOnOff;
+void pixelFill(int start, int end, int color);
+void targetRange();
+//Adafruit_NeoPixel pixel(PIXELCOUNT, SPI1, WS2812B); // declare object
+Adafruit_NeoPixel pixel(PIXELCOUNT, D2, WS2812B); // declare object
 
 // Water Pump
 const int PUMPIN = D7;
 float  pubValue;
 int subValue;
 // Millis Timer
-const int sampleTime = 500; //3000
-unsigned int duration, startTime;
+const int buttonTime = 250; //3000
+const int sampleTime = 250; //3000
+const int pixelTime = 20; //3000
+unsigned int duration, beginTime;
+
 // Date and Time String
 String DateTime, TimeOnly; // String variable for Date and Time
 // Adafruit BME
@@ -67,7 +99,7 @@ void MQTT_connect();
 bool MQTT_ping();
 // Let Device OS manage the connection to the Particle Cloud
 void getConc (); 
-SYSTEM_MODE(AUTOMATIC);
+SYSTEM_MODE(SEMI_AUTOMATIC);
 SYSTEM_THREAD(ENABLED);
 
 // View logs with CLI using 'particle serial monitor --follow'
@@ -75,8 +107,10 @@ SerialLogHandler logHandler(LOG_LEVEL_INFO);
 // setup() runs once, when the device is first turned on
 
 void setup() {
-Serial.begin(9600);
-waitFor(Serial.isConnected,10000);
+waitFor(Serial.isConnected, 5000);
+Serial.begin(115200);
+Serial1.begin(9600);
+delay(1000);
  // Connect to Internet but not Particle Cloud
 WiFi.on();
 WiFi.connect();
@@ -92,10 +126,45 @@ Particle.connect;
 Time.zone (-7); // MST = -7, MDT = -6
 Particle.syncTime (); // Sync time with Particle Cloud
 
+//--------------------------------------------------- TOF New Code
+Wire.begin(); // ToF start sequence
+
+if (!lox.begin()) {
+  Serial.println(F("Failed to boot VL53L0X"));
+  while(1);
+}
+// wait until serial port opens for native USB devices
+while (! Serial) {
+  delay(1);
+}
+Serial.println("Adafruit VL53L0X test");
+if (!lox.begin()) {
+  Serial.println(F("Failed to boot VL53L0X"));
+  while(1);
+}
+
 // Button
 pinMode(RESETBUTTON, INPUT);
 //Pump Pin
 pinMode (PUMPIN, OUTPUT);
+
+ // NeoPixel Set Up----------------------------------------------------------------
+pixel.begin ();
+pixel.setBrightness (64); // bri is a value 0 - 255
+pixel.show (); // initialize all off
+
+//DFRobotMP3Player
+  if (!myDFPlayer.begin(Serial1)) {  //Use softwareSerial to communicate with mp3.
+    Serial.printf("Unable to begin:\n");
+    Serial.printf("1.Please recheck the connection!\n");
+    Serial.printf("2.Please insert the SD card!\n");
+    while(true);
+  }
+  Serial.printf("DFPlayer Mini online.\n");
+  myDFPlayer.volume(15);  //Set volume value. From 0 to 30
+  myDFPlayer.loop(1);  //Play the first mp3
+// Millis Startime
+beginTime = millis();
 
 lastInterval = millis();
 // initialize BME
@@ -146,19 +215,108 @@ Adafruit_MQTT_Subscribe *subscription;
      if (resetBtn) {
     System.reset(RESET_NO_WAIT);
   }
-  // Water Pump Button OnOff
-  if ((millis()-startTime) > buttonTime) 
-  if(PUMPBUTTON.isPressed()) {
-    buttonState =!buttonState;
-    if (buttonState || subValue ) {
-      digitalWrite (PUMPIN, HIGH);
-      Serial.printf("Pump Button On\n");
-      } 
+
+ // Water Pump Button On Off
+  if(PUMPBUTTON.isClicked()) {
+    buttonState =!buttonState; 
+  }
+  //if ((millis()-startTime) > buttonTime){
+  if (buttonState  || subValue ) {
+  digitalWrite (PUMPIN, HIGH);
+  pixelFill(4,4, teal);
+  // Serial.printf("Pump Button On\n");
+  } 
+  else {
+  digitalWrite (PUMPIN, LOW);
+  pixelFill(4,4, black);
+    // Serial.printf("Pump OFF \n");
+  }
+// TOF Ranging functions
+VL53L0X_RangingMeasurementData_t measure;
+lox.rangingTest(&measure, false); // pass in 'true' to get debug data printout!
+targetRange(); // Neopixel VOID function int for target ranges
+if (measure.RangeStatus != 4) {  // phase failures have incorrect data
+    if(measure.RangeMilliMeter <= 70){ //80
+      targetLoc1 = TRUE;
+      targetLoc2 = FALSE;
+      targetLoc3 = FALSE;
+      targetLoc0 = FALSE;
+    // Serial.printf("targetPos 1%i\n", targetLoc1);
+    }
+    else if(measure.RangeMilliMeter > 80 && measure.RangeMilliMeter < 150){ // else
+      targetLoc2 = TRUE;
+      targetLoc1 = FALSE; 
+      targetLoc3 = FALSE;
+      targetLoc0 = FALSE;
+    // Serial.printf("targetPos 2%i\n", targetLoc2);
+    }
+    else if(measure.RangeMilliMeter > 160 && measure.RangeMilliMeter < 230){ // else
+      targetLoc3 = TRUE;
+      targetLoc1 = FALSE; 
+      targetLoc2 = FALSE;
+      targetLoc0 = FALSE;
+     //Serial.printf("targetPos 3%i\n", targetLoc3);
+    }
       else {
-      digitalWrite (PUMPIN, LOW);
-      Serial.printf("Pump OFF \n");
-      }
-      startTime = millis();
+      targetLoc0 = TRUE;
+      targetLoc1 = FALSE; 
+      targetLoc2 = FALSE; 
+      targetLoc3 = FALSE;
+     // Serial.printf("targetPos 0%i\n", targetLoc0);
+  }
+}
+
+} //End Void Loop Functions
+
+// VOID Functions Neopixel
+void pixelFill(int start, int end, int color) {
+ int i;
+ for (i=start; i<=end; i++){
+ pixel.setPixelColor (i, color); // hexadecimal color
+ }
+  pixel.show (); // nothing changes until show ()
+}
+
+void targetRange() {
+  if(targetLoc1){   // Neopixel TOF location 1  NeoPixel Ring OnOFF
+    if (neoOnOff){
+    pixelFill(0,3,green);
+    }
+    else {
+    pixelFill(0,3,red);
+    }
+    pixel.show();
+  }
+
+  if(targetLoc2){   // Neopixel TOF location 2  MP3 Tracks OnOFF
+    if (startStop){
+    pixelFill(0,3,turquoise);
+    }
+    else {
+    myDFPlayer.stop();
+    }
+    pixel.show();
+  }
+
+  if(targetLoc3){  // Neopixel TOF location 3  MP3 Volume OnOFF
+    if (volOnOff){
+    pixelFill(0,3,blue);
+    }
+    else {
+    pixelFill(0,3,yellow);
+    }
+    pixel.show();
+  }
+
+    if(targetLoc0){  // Neopixel TOF location 3  MP3 Volume OnOFF
+    blackOnOff =!blackOnOff;
+    if (blackOnOff){
+    pixelFill(0,3, black);
+    }
+    // else {
+    // pixelFill(0,3,black);
+    // }
+    // pixel.show();
   }
 }
 
