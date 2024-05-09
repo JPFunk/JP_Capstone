@@ -39,6 +39,9 @@ bool targetLoc0, targetLoc1, targetLoc2, targetLoc3;
 bool prevTargetLoc1, prevTargetLoc2, prevTargetLoc3;
 bool position;
 unsigned int rangeTime = 250;
+void targetButton1();
+void targetButton2();
+void targetButton3();
 
 // Reset Button
 int8_t RST;
@@ -51,6 +54,7 @@ bool changed, buttonState;
 
 // Touch Sensor
 Button PUMPBUTTON (D3);
+void WATERPUMP ();
 // const int buttonTime = 500; //3000 old needs to be removed once other code is working
 
 // Neopixel
@@ -177,6 +181,8 @@ startime = millis();
 
 // loop() runs over and over again, as quickly as it can execute.
 void loop() {
+WATERPUMP();
+
 MQTT_connect();
 MQTT_ping();
   DateTime =Time.timeStr(); // Current Date and Time from Particle Time class
@@ -201,8 +207,11 @@ Adafruit_MQTT_Subscribe *subscription;
       Serial.printf("pumpFeed%i\n", subValue);
       }
     }
-  
-  // Adafruit MQTT Publish functions
+      if (subscription == &pumpFeed) {
+      subValue = atoi((char *)pumpFeed.lastread);
+      Serial.printf("buttonFeed%i\n", subValue);
+      }
+  // Adafruit MQTT Publish functions----------------------------------------------
   Adafruit_MQTT_Publish *publish;
   static unsigned int last;
   if ((millis()-last)>10000 ) 
@@ -216,22 +225,8 @@ Adafruit_MQTT_Subscribe *subscription;
     System.reset(RESET_NO_WAIT);
   }
 
- // Water Pump Button On Off
-  if(PUMPBUTTON.isClicked()) {
-    buttonState =!buttonState; 
-  }
-  //if ((millis()-startTime) > buttonTime){
-  if (buttonState  || subValue ) {
-  digitalWrite (PUMPIN, HIGH);
-  pixelFill(4,4, teal);
-  // Serial.printf("Pump Button On\n");
-  } 
-  else {
-  digitalWrite (PUMPIN, LOW);
-  pixelFill(4,4, black);
-    // Serial.printf("Pump OFF \n");
-  }
-// TOF Ranging functions
+ 
+// TOF Ranging functions----------------------------------------------------------
 VL53L0X_RangingMeasurementData_t measure;
 lox.rangingTest(&measure, false); // pass in 'true' to get debug data printout!
 targetRange(); // Neopixel VOID function int for target ranges
@@ -268,6 +263,26 @@ if (measure.RangeStatus != 4) {  // phase failures have incorrect data
 
 } //End Void Loop Functions
 
+void WATERPUMP (){
+   // Pump Button
+  if(PUMPBUTTON.isClicked()) {
+    buttonState =!buttonState;
+    subValue = 0 ; 
+  }
+  //if ((millis()-beginTime) > buttonTime){
+  if (buttonState || subValue) {
+  digitalWrite (PUMPIN, HIGH);
+  pixelFill(4,4, teal);
+  // Serial.printf("Pump Button On\n");
+  } 
+  else {
+  digitalWrite (PUMPIN, LOW);
+  pixelFill(4,4, black);
+    // Serial.printf("Pump OFF \n");
+  }
+   // beginTime = millis();
+   //} Button Millis Bracket
+}
 // VOID Functions Neopixel
 void pixelFill(int start, int end, int color) {
  int i;
@@ -275,49 +290,6 @@ void pixelFill(int start, int end, int color) {
  pixel.setPixelColor (i, color); // hexadecimal color
  }
   pixel.show (); // nothing changes until show ()
-}
-
-void targetRange() {
-  if(targetLoc1){   // Neopixel TOF location 1  NeoPixel Ring OnOFF
-    if (neoOnOff){
-    pixelFill(0,3,green);
-    }
-    else {
-    pixelFill(0,3,red);
-    }
-    pixel.show();
-  }
-
-  if(targetLoc2){   // Neopixel TOF location 2  MP3 Tracks OnOFF
-    if (startStop){
-    pixelFill(0,3,turquoise);
-    }
-    else {
-    myDFPlayer.stop();
-    }
-    pixel.show();
-  }
-
-  if(targetLoc3){  // Neopixel TOF location 3  MP3 Volume OnOFF
-    if (volOnOff){
-    pixelFill(0,3,blue);
-    }
-    else {
-    pixelFill(0,3,yellow);
-    }
-    pixel.show();
-  }
-
-    if(targetLoc0){  // Neopixel TOF location 3  MP3 Volume OnOFF
-    blackOnOff =!blackOnOff;
-    if (blackOnOff){
-    pixelFill(0,3, black);
-    }
-    // else {
-    // pixelFill(0,3,black);
-    // }
-    // pixel.show();
-  }
 }
 
 // MQTT Adafruit.IO connections

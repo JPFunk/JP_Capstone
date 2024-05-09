@@ -6,23 +6,22 @@ The Oracle Fountain is a IoT smart indoor water feature with Lighting and Sound 
 Minimum Features:
   • Waterfall pump,  LED light show
   • Dashboard
-  • Minimum button control 
+  • Minimum button control TOF
   • 3D Printed Housing, with one upper waterfall ring
 
 Desired Features:
   •  MP3 player with speaker
-  •  2 modes water flow
-  •  3D Printed Housing, with 2 upper waterfall rings
-  •  Auto and Sleep Mode
+  •  3D Printed Housing, 1 upper waterfall ring
   •  Button less interface/controls (ToF)
 
 Stretch Goal Features:
   • Phone App subscription for sound loops and additional content *
+  • Auto and Sleep Mode
   • Patent, and produce for market
 
 Anticipated Components:
-  • *TOF sensors (at least 1), small board w/ P2, water pump, relay, neopixel ring *OLED, BME, *Encoder
-  • 3D Printed sections: Base, lower ring, top ring, LED module (top)
+  • *TOF sensors (at least 1), small board w/ P2, water pump, relay, neopixel ring  BME
+  • 3D Printed sections: Base, top ring, LED module (top)
   • Waterfall components: Tubing, connectors, water diffusers 
   • Electrical wiring, power supply (s)
 
