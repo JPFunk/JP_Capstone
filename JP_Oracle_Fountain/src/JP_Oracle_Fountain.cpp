@@ -35,7 +35,7 @@ const int volumeTime = 300; //3000
 // TOF VL53LOX Sensor
 Adafruit_VL53L0X lox = Adafruit_VL53L0X();
 int TOF;
-bool targetLoc0, targetLoc1, targetLoc2, targetLoc3;
+bool targetLoc0, targetLoc1, targetLoc2, targetLoc3, targetLoc4;
 bool prevTargetLoc1, prevTargetLoc2, prevTargetLoc3;
 bool position;
 unsigned int rangeTime = 250;
@@ -69,7 +69,8 @@ Adafruit_NeoPixel pixel(PIXELCOUNT, D2, WS2812B); // declare object
 // Water Pump
 const int PUMPIN = D7;
 float  pubValue;
-int subValue;
+bool subValue;
+
 // Millis Timer
 const int buttonTime = 250; //3000
 const int sampleTime = 250; //3000
@@ -187,8 +188,9 @@ MQTT_connect();
 MQTT_ping();
   DateTime =Time.timeStr(); // Current Date and Time from Particle Time class
   TimeOnly =DateTime.substring (11,19); // Extract the Time from the DateTime String
-  Serial.printf("Date and time is %s\n",DateTime.c_str());
-  Serial.printf("Time is %s\n",TimeOnly.c_str());
+  // Serial.printf("Date and time is %s\n",DateTime.c_str());
+  // Serial.printf("Time is %s\n",TimeOnly.c_str());
+
   // BME functions with OLED display
   tempC = bme.readTemperature();
   tempF = map (tempC,0.0,100.0,32.0,212.0);
@@ -207,10 +209,7 @@ Adafruit_MQTT_Subscribe *subscription;
       Serial.printf("pumpFeed%i\n", subValue);
       }
     }
-      if (subscription == &pumpFeed) {
-      subValue = atoi((char *)pumpFeed.lastread);
-      Serial.printf("buttonFeed%i\n", subValue);
-      }
+
   // Adafruit MQTT Publish functions----------------------------------------------
   Adafruit_MQTT_Publish *publish;
   static unsigned int last;
@@ -225,11 +224,10 @@ Adafruit_MQTT_Subscribe *subscription;
     System.reset(RESET_NO_WAIT);
   }
 
- 
 // TOF Ranging functions----------------------------------------------------------
 VL53L0X_RangingMeasurementData_t measure;
 lox.rangingTest(&measure, false); // pass in 'true' to get debug data printout!
-targetRange(); // Neopixel VOID function int for target ranges
+// targetRange(); // Neopixel VOID function int for target ranges
 if (measure.RangeStatus != 4) {  // phase failures have incorrect data
     if(measure.RangeMilliMeter <= 70){ //80
       targetLoc1 = TRUE;
@@ -267,21 +265,18 @@ void WATERPUMP (){
    // Pump Button
   if(PUMPBUTTON.isClicked()) {
     buttonState =!buttonState;
-    subValue = 0 ; 
   }
-  //if ((millis()-beginTime) > buttonTime){
-  if (buttonState || subValue) {
-  digitalWrite (PUMPIN, HIGH);
-  pixelFill(4,4, teal);
-  // Serial.printf("Pump Button On\n");
-  } 
+  if (buttonState || subValue){
+    digitalWrite (PUMPIN, HIGH);
+    pixelFill(4,4, teal);
+    Serial.printf("Pump Button On\n");
+    subValue = 0 ; 
+    } 
   else {
   digitalWrite (PUMPIN, LOW);
   pixelFill(4,4, black);
-    // Serial.printf("Pump OFF \n");
+  Serial.printf("Pump OFF \n");
   }
-   // beginTime = millis();
-   //} Button Millis Bracket
 }
 // VOID Functions Neopixel
 void pixelFill(int start, int end, int color) {
