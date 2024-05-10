@@ -32,7 +32,6 @@ const int volumeTime = 300; //3000
 Adafruit_VL53L0X lox = Adafruit_VL53L0X();
 int TOF; 
 bool targetLoc0, targetLoc1, targetLoc2, targetLoc3;
-bool pixelLoc0, pixelLoc1, pixelLoc2, pixelLoc3;
 bool prevTargetLoc1, prevTargetLoc2, prevTargetLoc3;
 bool position;
 const int rangeTime = 500;
@@ -174,11 +173,6 @@ if (measure.RangeStatus != 4) {  // phase failures have incorrect data
       targetLoc2 = FALSE;
       targetLoc3 = FALSE;
       targetLoc0 = FALSE;
-      // Pixel Location1 Code
-      pixelLoc1 = TRUE;
-      pixelLoc2 = FALSE;
-      pixelLoc3 = FALSE;
-      pixelLoc0 = FALSE;
     // Serial.printf("targetPos 1%i\n", targetLoc1);
     }
     else if(measure.RangeMilliMeter > 70 && measure.RangeMilliMeter < 150){
@@ -186,11 +180,6 @@ if (measure.RangeStatus != 4) {  // phase failures have incorrect data
       targetLoc1 = FALSE; 
       targetLoc3 = FALSE;
       targetLoc0 = FALSE;
-      // Pixel Location2 Code
-      pixelLoc2 = TRUE;
-      pixelLoc1 = FALSE; 
-      pixelLoc3 = FALSE;
-      pixelLoc0 = FALSE;
     // Serial.printf("targetPos 2%i\n", targetLoc2);
     }
     else if(measure.RangeMilliMeter > 150 && measure.RangeMilliMeter < 230){
@@ -198,11 +187,6 @@ if (measure.RangeStatus != 4) {  // phase failures have incorrect data
       targetLoc1 = FALSE; 
       targetLoc2 = FALSE;
       targetLoc0 = FALSE;
-      // Pixel Location3 Code
-      pixelLoc3 = TRUE;
-      pixelLoc1 = FALSE; 
-      pixelLoc2 = FALSE;
-      pixelLoc0 = FALSE;      
      //Serial.printf("targetPos 3%i\n", targetLoc3);
     }
       else {
@@ -210,11 +194,6 @@ if (measure.RangeStatus != 4) {  // phase failures have incorrect data
       targetLoc1 = FALSE; 
       targetLoc2 = FALSE; 
       targetLoc3 = FALSE;
-      // Pixel Location3 Code
-      pixelLoc0 = TRUE;
-      pixelLoc1 = FALSE; 
-      pixelLoc2 = FALSE; 
-      pixelLoc3 = FALSE;
      Serial.printf("targetPos 0%i\n", targetLoc0);
   }
  }    
@@ -244,6 +223,7 @@ void WATERPUMP (){
     // Serial.printf("Pump OFF \n");
   }
    // beginTime = millis();
+   //} Button Millis Bracket
 }
 
 // VOID Functions Neopixel
@@ -254,6 +234,7 @@ void pixelFill(int start, int end, int color) {
  }
   pixel.show (); // nothing changes until show ()
 }
+
 // TOF Level 1 Neopixel Range 0-70mm
 void targetButton1(){
   // TOF Level 1 Neopixel Range 0-70mm{
@@ -261,9 +242,10 @@ void targetButton1(){
  //((millis()-beginTime) > rangeTime);
     if (targetLoc1 == TRUE){
       neoOnOff= !neoOnOff;
+      repeatCycle = TRUE;
      // pixel.clear();
        if (neoOnOff) {
-        //rainbowRing(20);
+       //rainbowRing(20);
       //  pixelFill(0,3,purple);
         Serial.printf("Neo Ring On%i\n",targetLoc1);
         } else {
@@ -329,6 +311,55 @@ void targetButton3(){
     }
 }
 
+ // Neopixel activation with TOF Ranges
+void targetRange() {
+  //((millis()-beginTime) > rangeTime);
+  if(targetLoc1){   // Neopixel TOF location 1  NeoPixel Ring OnOFF
+    if (neoOnOff){
+      pixelFill(0,3,teal);
+     rainbowRing(20);
+    }
+    else {
+      pixelFill(0,3,orange);
+    }
+    strip.show();
+    strip.clear();
+    //pixel.show();
+    //beginTime = millis();
+  }
+
+  if(targetLoc2){   // Neopixel TOF location 2  MP3 Tracks OnOFF
+    if (startStop){
+    pixelFill(0,3,turquoise);
+    }
+    else {
+    pixelFill(0,3,magenta);
+    // myDFPlayer.stop(); don't know how this got here?
+    }
+    pixel.show();
+   // beginTime = millis();
+  }
+
+  if(targetLoc3){  // Neopixel TOF location 3  MP3 Volume OnOFF
+    if (volOnOff){
+    pixelFill(0,3,blue);
+    }
+    else {
+    pixelFill(0,3,lime);
+    }
+    pixel.show();
+   // beginTime = millis();
+  }
+
+    if(targetLoc0){  // Neopixel TOF location 0 Turn Off Black
+    blackOnOff =!blackOnOff;
+    if (blackOnOff){
+    pixelFill(0,3, black);
+    }
+  }
+}
+
+//------------------------------------------------------------------------------------
 // Rainbow Ring Neopixel Function for Crystal Ball
 // void rainbowRing(uint8_t hold) {
   //beginTime = millis();
@@ -342,67 +373,6 @@ void targetButton3(){
   //   }
   // }
 
-//uint32_t Wheel(byte WheelPos) {
-//   if(WheelPos < 85) {
-//    return strip.Color(WheelPos * 3, 255 - WheelPos * 3, 0);
-//   } else if(WheelPos < 170) {
-//    WheelPos -= 85;
-//    return strip.Color(255 - WheelPos * 3, 0, WheelPos * 3);
-//   } else {
-//    WheelPos -= 170;
-//    return strip.Color(0, WheelPos * 3, 255 - WheelPos * 3);
-//   }
-// }
-
- // Neopixel activation with TOF Ranges
-void targetRange() {
-  ((millis()-beginTime) > rangeTime);
-  if(pixelLoc1){   // Neopixel TOF location 1  NeoPixel Ring OnOFF
-    if (neoOnOff){
-      pixelFill(0,3,teal);
-      rainbowRing(20);
-    }
-    else {
-      pixelFill(0,3,orange);
-    }
-    strip.show();
-    strip.clear();
-    //pixel.show();
-    beginTime = millis();
-  }
-
-  if(pixelLoc2){   // Neopixel TOF location 2  MP3 Tracks OnOFF
-    if (startStop){
-    pixelFill(0,3,turquoise);
-    }
-    else {
-    pixelFill(0,3,magenta);
-    // myDFPlayer.stop(); don't know how this got here?
-    }
-    pixel.show();
-    beginTime = millis();
-  }
-
-  if(pixelLoc3){  // Neopixel TOF location 3  MP3 Volume OnOFF
-    if (volOnOff){
-    pixelFill(0,3,blue);
-    }
-    else {
-    pixelFill(0,3,lime);
-    }
-    pixel.show();
-    beginTime = millis();
-  }
-
-    if(pixelLoc0){  // Neopixel TOF location 0 Turn Off Black
-    blackOnOff =!blackOnOff;
-    if (blackOnOff){
-    pixelFill(0,3, black);
-    }
-  }
-}
-
-//------------------------------------------------------------------------------------
 void rainbowRing(uint8_t hold) {
   uint16_t k;
   static uint16_t j;
