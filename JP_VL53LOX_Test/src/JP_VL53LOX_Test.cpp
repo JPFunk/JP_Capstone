@@ -1,7 +1,7 @@
 /* 
  * Project JP VL53LOX test
  * Author: JP Funk
- * Date: 05/08/2024 Wedesday- still working on TOF bugs
+ * Date: 05/10/2024 Friday- still working on TOF, 3D printing small fixes
  * For comprehensive documentation and examples, please visit:
  * https://docs.particle.io/firmware/best-practices/firmware-template/
  */
@@ -31,7 +31,7 @@ const int volumeTime = 300; //3000
 // TOF VL53LOX Sensor
 Adafruit_VL53L0X lox = Adafruit_VL53L0X();
 int TOF; 
-bool targetLoc0, targetLoc1, targetLoc2, targetLoc3;
+bool targetLoc0, targetLoc1, targetLoc2, targetLoc3, targetLoc4;
 bool prevTargetLoc1, prevTargetLoc2, prevTargetLoc3;
 bool position;
 const int rangeTime = 500;
@@ -86,6 +86,7 @@ Adafruit_NeoPixel strip(PIXEL_COUNT, D12, WS2812B);
 void rainbowRing(uint8_t hold);
 uint32_t Wheel(byte WheelPos);
 IoTTimer neoTimer; // New Neo COde
+IoTTimer locTimer; // New Neo COde
 bool repeatCycle; // New Neo COde
 // Run the application and system concurrently in separate threads
 SYSTEM_THREAD(ENABLED);
@@ -162,16 +163,18 @@ void loop() {
   targetButton1();
   targetButton2();
   targetButton3();
-
+ locTimer.startTimer(10000);
 // TOF Ranging functions
 VL53L0X_RangingMeasurementData_t measure;
 lox.rangingTest(&measure, false); // pass in 'true' to get debug data printout!
 targetRange(); // Neopixel VOID function int for target ranges
-if (measure.RangeStatus != 4) {  // phase failures have incorrect data
+Serial.printf("measure data %i\n",measure.RangeMilliMeter);
+if (measure.RangeStatus != 5) {  // phase failures have incorrect data
     if(measure.RangeMilliMeter <= 70){
       targetLoc1 = TRUE;
       targetLoc2 = FALSE;
       targetLoc3 = FALSE;
+      targetLoc4 = FALSE;
       targetLoc0 = FALSE;
     // Serial.printf("targetPos 1%i\n", targetLoc1);
     }
@@ -179,6 +182,7 @@ if (measure.RangeStatus != 4) {  // phase failures have incorrect data
       targetLoc2 = TRUE;
       targetLoc1 = FALSE; 
       targetLoc3 = FALSE;
+      targetLoc4 = FALSE;
       targetLoc0 = FALSE;
     // Serial.printf("targetPos 2%i\n", targetLoc2);
     }
@@ -186,25 +190,29 @@ if (measure.RangeStatus != 4) {  // phase failures have incorrect data
       targetLoc3 = TRUE;
       targetLoc1 = FALSE; 
       targetLoc2 = FALSE;
+      targetLoc4 = FALSE;
       targetLoc0 = FALSE;
      //Serial.printf("targetPos 3%i\n", targetLoc3);
     }
-      else {
+      else if (measure.RangeMilliMeter > 230 && measure.RangeMilliMeter < 400){
+      targetLoc4 = TRUE;
+      targetLoc1 = FALSE; 
+      targetLoc2 = FALSE; 
+      targetLoc3 = FALSE;
+      targetLoc0 = FALSE;
+     //Serial.printf("targetPos 0%i\n", targetLoc0);
+  }  
+      else if  (measure.RangeMilliMeter > 7000){//Reset
+      locTimer.startTimer(10000);
       targetLoc0 = TRUE;
       targetLoc1 = FALSE; 
       targetLoc2 = FALSE; 
       targetLoc3 = FALSE;
-     Serial.printf("targetPos 0%i\n", targetLoc0);
-  }
- }    
-      else { //Reset
-      targetLoc0 = TRUE;
-      targetLoc1 = FALSE; 
-      targetLoc2 = FALSE; 
-      targetLoc3 = FALSE;
-     Serial.printf("targetPos 0%i\n", targetLoc0);
+      targetLoc4 = FALSE;
+     //Serial.printf("targetPos 0%i\n", targetLoc0);
  }
 } // End Void Loop
+}
 
 void WATERPUMP (){
    // Pump Button
@@ -240,10 +248,11 @@ void targetButton1(){
   // TOF Level 1 Neopixel Range 0-70mm{
   if (targetLoc1 != prevTargetLoc1){
  //((millis()-beginTime) > rangeTime);
+
     if (targetLoc1 == TRUE){
       neoOnOff= !neoOnOff;
-      repeatCycle = TRUE;
-     // pixel.clear();
+      //repeatCycle = TRUE;
+      //rainbowRing(20);
        if (neoOnOff) {
        //rainbowRing(20);
       //  pixelFill(0,3,purple);
@@ -316,14 +325,17 @@ void targetRange() {
   //((millis()-beginTime) > rangeTime);
   if(targetLoc1){   // Neopixel TOF location 1  NeoPixel Ring OnOFF
     if (neoOnOff){
+      repeatCycle = TRUE;
       pixelFill(0,3,teal);
-     rainbowRing(20);
+      rainbowRing(20);
     }
     else {
       pixelFill(0,3,orange);
+      strip.clear();
+      strip.show();
+    
     }
-    strip.show();
-    strip.clear();
+
     //pixel.show();
     //beginTime = millis();
   }
@@ -351,9 +363,22 @@ void targetRange() {
    // beginTime = millis();
   }
 
-    if(targetLoc0){  // Neopixel TOF location 0 Turn Off Black
+  if(targetLoc4){  // Neopixel TOF location 0 Turn Off Black
     blackOnOff =!blackOnOff;
     if (blackOnOff){
+    pixelFill(0,3, black);
+    }
+  }
+
+  if(targetLoc0){  // Neopixel TOF reset
+  rainbowRing(20);
+  if (neoOnOff == FALSE){
+    strip.show();
+    strip.clear();
+  }
+   if(locTimer.isTimerReady()){
+   // blackOnOff =!blackOnOff;
+    //if (blackOnOff){
     pixelFill(0,3, black);
     }
   }
