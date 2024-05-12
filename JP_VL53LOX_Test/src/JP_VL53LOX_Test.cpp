@@ -102,8 +102,7 @@ void setup() {
   Serial1.begin(9600);
   delay(1000);
   
-  strip.begin();
-  strip.show(); // Initialize all pixels to 'off'
+
   Wire.begin(); // ToF start sequence
 // New Neo Code--------------------------------------------------
   strip.begin();
@@ -322,7 +321,6 @@ void targetButton3(){
 
  // Neopixel activation with TOF Ranges
 void targetRange() {
-  //((millis()-beginTime) > rangeTime);
   if(targetLoc1){   // Neopixel TOF location 1  NeoPixel Ring OnOFF
     if (neoOnOff){
       repeatCycle = TRUE;
@@ -333,11 +331,7 @@ void targetRange() {
       pixelFill(0,3,orange);
       strip.clear();
       strip.show();
-    
     }
-
-    //pixel.show();
-    //beginTime = millis();
   }
 
   if(targetLoc2){   // Neopixel TOF location 2  MP3 Tracks OnOFF
@@ -349,7 +343,6 @@ void targetRange() {
     // myDFPlayer.stop(); don't know how this got here?
     }
     pixel.show();
-   // beginTime = millis();
   }
 
   if(targetLoc3){  // Neopixel TOF location 3  MP3 Volume OnOFF
@@ -360,7 +353,6 @@ void targetRange() {
     pixelFill(0,3,lime);
     }
     pixel.show();
-   // beginTime = millis();
   }
 
   if(targetLoc4){  // Neopixel TOF location 0 Turn Off Black

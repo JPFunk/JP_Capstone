@@ -1,7 +1,7 @@
 /* 
  * Project JP_Oracle_Fountain
  * Author: JP Funk
- * Date: 05/10/2024 Friday update with VL53LOX_Test code functions
+ * Date: 05/12/2024 Sunday early update only 3 main bugs to fix! Rainbow, pixelDash and mp3Dash button functions :)
  * For comprehensive documentation and examples, please visit:
  * https://docs.particle.io/firmware/best-practices/firmware-template/
  */
@@ -31,6 +31,7 @@ bool startStop;
 bool volOnOff;
 int track;
 const int volumeTime = 300; //3000
+bool mp3Dash;
 
 // TOF VL53LOX Sensor
 Adafruit_VL53L0X lox = Adafruit_VL53L0X();
@@ -55,7 +56,6 @@ bool changed, buttonState;
 // Touch Sensor
 Button PUMPBUTTON (D3);
 void WATERPUMP ();
-// const int buttonTime = 500; //3000 old needs to be removed once other code is working
 
 // Neopixel
 const int PIXELCOUNT = 5; // Total number of single NeoPixels
@@ -63,13 +63,13 @@ int i, pixelAddr, colorCount, hold;
 bool neoOnOff, blackOnOff,  randomOnOff;
 void pixelFill(int start, int end, int color);
 void targetRange();
-//Adafruit_NeoPixel pixel(PIXELCOUNT, SPI1, WS2812B); // declare object
-Adafruit_NeoPixel pixel(PIXELCOUNT, D2, WS2812B); // declare object
+//Adafruit_NeoPixel pixel(PIXELCOUNT, SPI1, WS2812B); // declare object for Photon2
+Adafruit_NeoPixel pixel(PIXELCOUNT, D2, WS2812B); // declare object for Argon
 
 // Water Pump
 const int PUMPIN = D7;
 float  pubValue;
-bool subValue;
+bool  pumpDash;
 
 // Millis Timer
 const int buttonTime = 250; //3000
@@ -79,6 +79,7 @@ unsigned int duration, beginTime;
 
 // Date and Time String
 String DateTime, TimeOnly; // String variable for Date and Time
+
 // Adafruit BME
 Adafruit_BME280 bme;
 const char degree = 0xf8;
@@ -86,6 +87,7 @@ const int delayTime =1000;
 bool status;
 int hexAddress, startime;
 float tempC, pressPA, humidRH, tempF, inHG;
+void BMEValues();
 
 void watchdogHandler() {
 // Do as little as possible in this function , preferably just a reset
@@ -98,7 +100,9 @@ Adafruit_MQTT_Publish tempFeed = Adafruit_MQTT_Publish(&mqtt,AIO_USERNAME"/feeds
 Adafruit_MQTT_Publish pressFeed = Adafruit_MQTT_Publish(&mqtt,AIO_USERNAME"/feeds/pressFeed");
 Adafruit_MQTT_Publish humidFeed = Adafruit_MQTT_Publish(&mqtt,AIO_USERNAME"/feeds/humidFeed");
 Adafruit_MQTT_Subscribe pumpFeed = Adafruit_MQTT_Subscribe(&mqtt,AIO_USERNAME"/feeds/pumpFeed");
-Adafruit_MQTT_Subscribe buttonFeed = Adafruit_MQTT_Subscribe(&mqtt,AIO_USERNAME"/feeds/buttononoff");  
+Adafruit_MQTT_Subscribe buttonFeed = Adafruit_MQTT_Subscribe(&mqtt,AIO_USERNAME"/feeds/buttononoff"); 
+Adafruit_MQTT_Subscribe MP3Feed = Adafruit_MQTT_Subscribe(&mqtt,AIO_USERNAME"/feeds/MP3Feed");
+Adafruit_MQTT_Subscribe PixelRingFeed = Adafruit_MQTT_Subscribe(&mqtt,AIO_USERNAME"/feeds/PixelRingFeed");  
 /************Declare Functions*************/
 void MQTT_connect();
 bool MQTT_ping();
@@ -113,14 +117,15 @@ SYSTEM_MODE(SEMI_AUTOMATIC);
 #endif
 #define PIXEL_COUNT 12
 #define PIXEL_TYPE WS2812B
-//#define PIXEL_TYPE WS2812B
 //Adafruit_NeoPixel strip(PIXEL_COUNT, SPI, WS2812B); for Photon 2
-Adafruit_NeoPixel strip(PIXEL_COUNT, D12, WS2812B);
+Adafruit_NeoPixel strip(PIXEL_COUNT, D12, WS2812B); //for Argon
 void rainbowRing(uint8_t hold);
 uint32_t Wheel(byte WheelPos);
 IoTTimer neoTimer; // New Neo COde
 IoTTimer locTimer; // New Neo COde
 bool repeatCycle; // New Neo COde
+bool pixelDash;
+
 SYSTEM_THREAD(ENABLED);
 
 // View logs with CLI using 'particle serial monitor --follow'
@@ -128,17 +133,17 @@ SerialLogHandler logHandler(LOG_LEVEL_INFO);
 // setup() runs once, when the device is first turned on
 
 void setup() {
-  waitFor(Serial.isConnected, 5000);
-  Serial.begin(115200);
-  Serial1.begin(9600);
-  delay(1000);
+waitFor(Serial.isConnected, 5000);
+Serial.begin(115200);
+Serial1.begin(9600);
+delay(1000);
 
   Wire.begin(); // ToF start sequence
 // New Neo Code--------------------------------------------------
-  strip.begin();
-  strip.show(); // Initialize all pixels to 'off'
-  repeatCycle = TRUE;
-  neoTimer.startTimer(20);
+strip.begin();
+strip.show(); // Initialize all pixels to 'off'
+repeatCycle = TRUE;
+neoTimer.startTimer(20);
 //--------------------------------------------------- TOF New Code
 
 if (!lox.begin()) {
@@ -165,6 +170,9 @@ Serial.printf("\n\n");
 // Setup MQTT subscription
 mqtt.subscribe(&buttonFeed);
 mqtt.subscribe(&pumpFeed);
+mqtt.subscribe(&MP3Feed);
+mqtt.subscribe(&PixelRingFeed);
+
  // Particle Time
 Particle.connect;  
 Time.zone (-7); // MST = -7, MDT = -6
@@ -190,15 +198,15 @@ for (colorCount = 0; colorCount <= 6; colorCount++) {
  }
 
 //DFRobotMP3Player
-  if (!myDFPlayer.begin(Serial1)) {  //Use softwareSerial to communicate with mp3.
-    Serial.printf("Unable to begin:\n");
-    Serial.printf("1.Please recheck the connection!\n");
-    Serial.printf("2.Please insert the SD card!\n");
-    while(true);
-  }
-  Serial.printf("DFPlayer Mini online.\n");
-  myDFPlayer.volume(15);  //Set volume value. From 0 to 30
-  myDFPlayer.loop(1);  //Play the first mp3
+if (!myDFPlayer.begin(Serial1)) {  //Use softwareSerial to communicate with mp3.
+  Serial.printf("Unable to begin:\n");
+  Serial.printf("1.Please recheck the connection!\n");
+  Serial.printf("2.Please insert the SD card!\n");
+  while(true);
+}
+Serial.printf("DFPlayer Mini online.\n");
+myDFPlayer.volume(15);  //Set volume value. From 0 to 30
+myDFPlayer.loop(1);  //Play the first mp3
 // Millis Startime
 beginTime = millis();
 
@@ -213,11 +221,12 @@ startime = millis();
 
 // loop() runs over and over again, as quickly as it can execute.
 void loop() {
-  WATERPUMP();
- //targetButton1();
-  targetButton2();
-  targetButton3();
- locTimer.startTimer(10000);
+WATERPUMP();
+targetButton1();
+targetButton2();
+targetButton3();
+locTimer.startTimer(10000);
+ 
  // TOF Ranging functions
 VL53L0X_RangingMeasurementData_t measure;
 lox.rangingTest(&measure, false); // pass in 'true' to get debug data printout!
@@ -269,32 +278,33 @@ if (measure.RangeStatus != 5) {  // phase failures have incorrect data
 
 MQTT_connect();
 MQTT_ping();
-  DateTime =Time.timeStr(); // Current Date and Time from Particle Time class
-  TimeOnly =DateTime.substring (11,19); // Extract the Time from the DateTime String
+BMEValues();
 
-  // BME functions with OLED display
-  tempC = bme.readTemperature();
-  tempF = map (tempC,0.0,100.0,32.0,212.0);
-  pressPA = bme.readPressure();
-  inHG = pressPA / 3386.0;
-  humidRH = bme.readHumidity();
-  // Adafruit Dashboard Button for Reset
+// Adafruit Dashboard Button Functions
 Adafruit_MQTT_Subscribe *subscription;
-  while ((subscription = mqtt.readSubscription(100))) {
-    if (subscription == &buttonFeed) {
-      resetBtn = atoi((char *)buttonFeed.lastread);
-      Serial.printf("buttonFeed%i\n", resetBtn);
-      }
-    if (subscription == &pumpFeed) {
-      subValue = atoi((char *)pumpFeed.lastread);
-      Serial.printf("pumpFeed%i\n", subValue);
-      }
+while ((subscription = mqtt.readSubscription(100))) {
+  if (subscription == &buttonFeed) {
+    resetBtn = atoi((char *)buttonFeed.lastread);
+    Serial.printf("buttonFeed%i\n", resetBtn);
     }
+  if (subscription == &pumpFeed) {
+    pumpDash = atoi((char *)pumpFeed.lastread);
+    Serial.printf("pumpFeed%i\n", pumpDash); //subValue
+    }
+  if (subscription == &MP3Feed) {
+    mp3Dash = atoi((char *)MP3Feed.lastread);
+    Serial.printf("MP3Feed%i\n", mp3Dash);
+    }
+  if (subscription == &PixelRingFeed) {
+    pixelDash = atoi((char *)PixelRingFeed.lastread);
+    Serial.printf("PixelRingFeed%i\n", pixelDash);
+    }
+  }
 
-  // Adafruit MQTT Publish functions----------------------------------------------
-  Adafruit_MQTT_Publish *publish;
-  static unsigned int last;
-  if ((millis()-last)>10000 ) 
+// Adafruit MQTT Publish functions----------------------------------------------
+Adafruit_MQTT_Publish *publish;
+static unsigned int last;
+if ((millis()-last)>10000 ) 
   if(mqtt.Update()) {
     tempFeed.publish(tempF);
     pressFeed.publish(inHG);
@@ -307,16 +317,27 @@ Adafruit_MQTT_Subscribe *subscription;
 
 } //End Void Loop Functions
 
+void BMEValues(){
+  DateTime =Time.timeStr(); // Current Date and Time from Particle Time class
+  TimeOnly =DateTime.substring (11,19); // Extract the Time from the DateTime String
+  // BME functions with OLED display
+  tempC = bme.readTemperature();
+  tempF = map (tempC,0.0,100.0,32.0,212.0);
+  pressPA = bme.readPressure();
+  inHG = pressPA / 3386.0;
+  humidRH = bme.readHumidity();  
+}
+
 void WATERPUMP (){
    // Pump Button
   if(PUMPBUTTON.isClicked()) {
     buttonState =!buttonState;
-    //subValue = 0;
+    pumpDash = !pumpDash;
   }
-  if (buttonState || subValue){
+  if (buttonState || pumpDash){
     digitalWrite (PUMPIN, HIGH);
-    pixelFill(4,4, teal);
-    subValue = 0;
+    pixel.setBrightness (128);
+    pixelFill(4,4, turquoise);
     Serial.printf("Pump Button On\n");
     } 
     else {
@@ -324,7 +345,8 @@ void WATERPUMP (){
     pixelFill(4,4, black);
     Serial.printf("Pump OFF \n");
     }
-}
+  }
+
 // VOID Functions Neopixel
 void pixelFill(int start, int end, int color) {
  int i;
@@ -334,13 +356,35 @@ void pixelFill(int start, int end, int color) {
   pixel.show (); // nothing changes until show ()
 }
 
-// TOF Level 2 MP3 Next old Range 100-200mm
+// TOF Level 1 Rainbow TOF Range 70
+void targetButton1(){
+  // TOF Level 1 Neopixel Range 0-70mm{
+  if (targetLoc1 != prevTargetLoc1){
+    if (targetLoc1 == TRUE){
+      // pixelDash = !pixelDash; // Dashboard button OnOff togle Function
+      neoOnOff= !neoOnOff;
+      //repeatCycle = TRUE;
+      //rainbowRing(20);
+       if (neoOnOff) {
+       //rainbowRing(20);
+        Serial.printf("Neo Ring On%i\n",targetLoc1);
+        } else {
+        Serial.printf("Neo Ring Off%i\n",targetLoc1);
+        strip.clear();
+        }
+      }
+      prevTargetLoc1 = targetLoc1;
+    }
+  }
+
+// TOF Level 2 MP3 TOF Range 70-150mm
 void targetButton2(){
   if (targetLoc2 != prevTargetLoc2) {
+    // mp3Dash =! mp3Dash; // Dashboard button OnOff togle Function
      Serial.printf("targetLoc 2 changed%i\n",targetLoc2);
     if (targetLoc2 == TRUE){
       startStop = !startStop;
-      if (startStop){
+      if (startStop || mp3Dash){
         myDFPlayer.play(track%3+1);
         Serial.printf("MP3 On%i\n",targetLoc2);
          // myDFPlayer.loop(1); 
@@ -354,7 +398,7 @@ void targetButton2(){
    }
 }
 
-// TOF Level 3 MP3 Volume old Range 200-300mm
+// TOF Level 3 MP3 Volume old Range 150-230mm
 void targetButton3(){
   if (targetLoc3 != prevTargetLoc3) {
     if (targetLoc3 == TRUE){
@@ -378,8 +422,8 @@ void targetRange() {
   if(targetLoc1){   // Neopixel TOF location 1  NeoPixel Ring OnOFF
     if (neoOnOff){
       repeatCycle = TRUE;
-      pixelFill(0,3,teal);
       rainbowRing(20);
+      pixelFill(0,3,teal);
     }
     else {
       pixelFill(0,3,orange);
@@ -477,7 +521,7 @@ void MQTT_connect() {
 bool MQTT_ping() {
   static unsigned int last;
   bool pingStatus;
-  if ((millis()-last)>120000) {
+  if ((millis()-last)>200000) {
     Serial.printf("Pinging MQTT \n");
     pingStatus = mqtt.ping();
     if(!pingStatus) {
