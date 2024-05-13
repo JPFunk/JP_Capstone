@@ -1,7 +1,7 @@
 /* 
  * Project JP_Oracle_Fountain
  * Author: JP Funk
- * Date: 05/12/2024 Sunday early update only 3 main bugs to fix! Rainbow, pixelDash and mp3Dash button functions :)
+ * Date: 05/12/2024 Sunday evening update 2 main bugs to fix! Rainbow OnOff w/pixelDash and mp3Dash button functions :)
  * For comprehensive documentation and examples, please visit:
  * https://docs.particle.io/firmware/best-practices/firmware-template/
  */
@@ -27,11 +27,8 @@
 DFRobotDFPlayerMini myDFPlayer;
 Button nextButton(D0);
 unsigned int lastSong;
-bool startStop;
-bool volOnOff;
 int track;
-const int volumeTime = 300; //3000
-bool mp3Dash;
+bool startStop, volOnOff, mp3Dash, prevMp3Dash;
 
 // TOF VL53LOX Sensor
 Adafruit_VL53L0X lox = Adafruit_VL53L0X();
@@ -47,9 +44,8 @@ void targetButton3();
 // Reset Button
 int8_t RST;
 const int RESETBUTTON (RST);
-int resetBtn;
-int lastInterval;
-bool buttonState1;
+int resetBtn, lastInterval;
+//bool buttonState1;
 void buttonisClicked();
 bool changed, buttonState;
 
@@ -60,7 +56,7 @@ void WATERPUMP ();
 // Neopixel
 const int PIXELCOUNT = 5; // Total number of single NeoPixels
 int i, pixelAddr, colorCount, hold;
-bool neoOnOff, blackOnOff,  randomOnOff;
+bool neoOnOff, blackOnOff;
 void pixelFill(int start, int end, int color);
 void targetRange();
 //Adafruit_NeoPixel pixel(PIXELCOUNT, SPI1, WS2812B); // declare object for Photon2
@@ -72,10 +68,7 @@ float  pubValue;
 bool  pumpDash;
 
 // Millis Timer
-const int buttonTime = 250; //3000
-const int sampleTime = 250; //3000
-const int pixelTime = 20; //3000
-unsigned int duration, beginTime;
+unsigned int beginTime;
 
 // Date and Time String
 String DateTime, TimeOnly; // String variable for Date and Time
@@ -111,20 +104,13 @@ void getConc ();
  
 SYSTEM_MODE(SEMI_AUTOMATIC);
 
-#if (PLATFORM_ID == 32)
-//const int PIXEL_COUNT = 12;
-#define PIXEL_PIN D12
-#endif
-#define PIXEL_COUNT 12
-#define PIXEL_TYPE WS2812B
-//Adafruit_NeoPixel strip(PIXEL_COUNT, SPI, WS2812B); for Photon 2
+const int PIXEL_COUNT =12;
 Adafruit_NeoPixel strip(PIXEL_COUNT, D12, WS2812B); //for Argon
 void rainbowRing(uint8_t hold);
 uint32_t Wheel(byte WheelPos);
-IoTTimer neoTimer; // New Neo COde
-IoTTimer locTimer; // New Neo COde
-bool repeatCycle; // New Neo COde
-bool pixelDash;
+IoTTimer neoTimer;
+IoTTimer locTimer;
+bool repeatCycle, pixelDash, prevPixelDash;
 
 SYSTEM_THREAD(ENABLED);
 
@@ -138,7 +124,7 @@ Serial.begin(115200);
 Serial1.begin(9600);
 delay(1000);
 
-  Wire.begin(); // ToF start sequence
+Wire.begin(); // ToF start sequence
 // New Neo Code--------------------------------------------------
 strip.begin();
 strip.show(); // Initialize all pixels to 'off'
@@ -187,15 +173,6 @@ pinMode (PUMPIN, OUTPUT);
 pixel.begin ();
 pixel.setBrightness (64); // bri is a value 0 - 255
 pixel.show (); // initialize all off
-
-// Neopixel Ring-----------------------------------------
-for (colorCount = 0; colorCount <= 6; colorCount++) {
-  // The core of your code will likely live here.
- pixel.setPixelColor(pixelAddr, rainbow[colorCount]);
- pixelAddr++;
- pixel.show (); // nothing changes until show (){
- delay(200);
- }
 
 //DFRobotMP3Player
 if (!myDFPlayer.begin(Serial1)) {  //Use softwareSerial to communicate with mp3.
@@ -294,6 +271,7 @@ while ((subscription = mqtt.readSubscription(100))) {
   if (subscription == &MP3Feed) {
     mp3Dash = atoi((char *)MP3Feed.lastread);
     Serial.printf("MP3Feed%i\n", mp3Dash);
+    targetButton2();
     }
   if (subscription == &PixelRingFeed) {
     pixelDash = atoi((char *)PixelRingFeed.lastread);
@@ -314,7 +292,6 @@ if ((millis()-last)>10000 )
     if (resetBtn) {
     System.reset(RESET_NO_WAIT);
   }
-
 } //End Void Loop Functions
 
 void BMEValues(){
@@ -356,46 +333,49 @@ void pixelFill(int start, int end, int color) {
   pixel.show (); // nothing changes until show ()
 }
 
-// TOF Level 1 Rainbow TOF Range 70
+// TOF Level 1 Neopixel Range 0-70mm w/ Dashboard button OnOff togle Function
 void targetButton1(){
-  // TOF Level 1 Neopixel Range 0-70mm{
-  if (targetLoc1 != prevTargetLoc1){
-    if (targetLoc1 == TRUE){
-      // pixelDash = !pixelDash; // Dashboard button OnOff togle Function
+  if ((targetLoc1 != prevTargetLoc1) || pixelDash != prevPixelDash) { //(targetLoc1 != prevTargetLoc1)
+    if ((targetLoc1 == TRUE) || pixelDash == TRUE){
       neoOnOff= !neoOnOff;
-      //repeatCycle = TRUE;
-      //rainbowRing(20);
-       if (neoOnOff) {
-       //rainbowRing(20);
-        Serial.printf("Neo Ring On%i\n",targetLoc1);
-        } else {
-        Serial.printf("Neo Ring Off%i\n",targetLoc1);
-        strip.clear();
-        }
+      if (neoOnOff) {
+      repeatCycle = TRUE;
+      rainbowRing(20);
+      Serial.printf("Neo Ring On%i\n",targetLoc1);
+      Serial.printf("Neo Ring Dash On%i\n",pixelDash);
+      } else {
+      Serial.printf("Neo Ring Off%i\n",targetLoc1);
+      Serial.printf("Neo Ring Dash Off%i\n",pixelDash);
+      strip.clear();
+      strip.show();
       }
-      prevTargetLoc1 = targetLoc1;
     }
+  prevTargetLoc1 = targetLoc1;
+  prevPixelDash = pixelDash;
   }
+}
 
-// TOF Level 2 MP3 TOF Range 70-150mm
+// TOF Level 2 MP3 TOF Range 70-150mm  w/ Dashboard button OnOff togle Function
 void targetButton2(){
-  if (targetLoc2 != prevTargetLoc2) {
-    // mp3Dash =! mp3Dash; // Dashboard button OnOff togle Function
+  if ((targetLoc2 != prevTargetLoc2) || mp3Dash != prevMp3Dash) {
      Serial.printf("targetLoc 2 changed%i\n",targetLoc2);
-    if (targetLoc2 == TRUE){
+    if ((targetLoc2 == TRUE) || mp3Dash == TRUE) {
       startStop = !startStop;
       if (startStop || mp3Dash){
         myDFPlayer.play(track%3+1);
         Serial.printf("MP3 On%i\n",targetLoc2);
-         // myDFPlayer.loop(1); 
-          } else {
-          myDFPlayer.stop();
-          Serial.printf("MP3 Off%i\n",targetLoc2);
-          track++;
-          }
-        }
-      prevTargetLoc2 = targetLoc2; // previous location
-   }
+        Serial.printf("MP3 Dash On%i\n",mp3Dash);
+      } else {
+      myDFPlayer.stop();
+      Serial.printf("MP3 Off%i\n",targetLoc2);
+      Serial.printf("MP3 Dash Off%i\n",mp3Dash);
+      //prevMp3Dash = mp3Dash;
+      track++;
+      }
+    }
+  prevTargetLoc2 = targetLoc2; // previous location
+  prevMp3Dash = mp3Dash;
+  }
 }
 
 // TOF Level 3 MP3 Volume old Range 150-230mm
@@ -407,28 +387,28 @@ void targetButton3(){
       if (volOnOff){
         myDFPlayer.volume(30);
         Serial.printf("Volume On%i\n",targetLoc3);
-        } else {
-          myDFPlayer.volume(0);
-          Serial.printf("Volume Off%i\n",targetLoc3);
-        }
-        pixel.show();
+      } else {
+        myDFPlayer.volume(0);
+        Serial.printf("Volume Off%i\n",targetLoc3);
       }
-    prevTargetLoc3 = targetLoc3;
+      pixel.show();
     }
+  prevTargetLoc3 = targetLoc3;
+  }
 }
 
  // Neopixel activation with TOF Ranges
 void targetRange() {
   if(targetLoc1){   // Neopixel TOF location 1  NeoPixel Ring OnOFF
     if (neoOnOff){
-      repeatCycle = TRUE;
-      rainbowRing(20);
-      pixelFill(0,3,teal);
+    //  repeatCycle = TRUE;
+     // rainbowRing(20);
+    pixelFill(0,3,teal);
     }
     else {
-      pixelFill(0,3,orange);
-      strip.clear();
-      strip.show();
+    pixelFill(0,3,orange);
+    strip.clear();
+    strip.show();
     }
   }
 
@@ -462,13 +442,11 @@ void targetRange() {
 
   if(targetLoc0){  // Neopixel TOF reset
   rainbowRing(20);
-  if (neoOnOff == FALSE){
+    if (neoOnOff == FALSE){
     strip.show();
     strip.clear();
-  }
-   if(locTimer.isTimerReady()){
-   // blackOnOff =!blackOnOff;
-    //if (blackOnOff){
+      }
+    if(locTimer.isTimerReady()){
     pixelFill(0,3, black);
     }
   }
