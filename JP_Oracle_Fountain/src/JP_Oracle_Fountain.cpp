@@ -1,7 +1,7 @@
 /* 
  * Project JP_Oracle_Fountain
  * Author: JP Funk
- * Date: 05/12/2024 Sunday evening update 2 main bugs to fix! Rainbow OnOff w/pixelDash and mp3Dash button functions :)
+ * Date: 05/13/2024 Monday update Finished!
  * For comprehensive documentation and examples, please visit:
  * https://docs.particle.io/firmware/best-practices/firmware-template/
  */
@@ -45,6 +45,7 @@ void targetButton3();
 int8_t RST;
 const int RESETBUTTON (RST);
 int resetBtn, lastInterval;
+
 //bool buttonState1;
 void buttonisClicked();
 bool changed, buttonState;
@@ -54,13 +55,12 @@ Button PUMPBUTTON (D3);
 void WATERPUMP ();
 
 // Neopixel
-const int PIXELCOUNT = 5; // Total number of single NeoPixels
+const int PIXELCOUNT = 5;
 int i, pixelAddr, colorCount, hold;
 bool neoOnOff, blackOnOff;
 void pixelFill(int start, int end, int color);
 void targetRange();
-//Adafruit_NeoPixel pixel(PIXELCOUNT, SPI1, WS2812B); // declare object for Photon2
-Adafruit_NeoPixel pixel(PIXELCOUNT, D2, WS2812B); // declare object for Argon
+Adafruit_NeoPixel pixel(PIXELCOUNT, D2, WS2812B);
 
 // Water Pump
 const int PUMPIN = D7;
@@ -105,7 +105,7 @@ void getConc ();
 SYSTEM_MODE(SEMI_AUTOMATIC);
 
 const int PIXEL_COUNT =12;
-Adafruit_NeoPixel strip(PIXEL_COUNT, D12, WS2812B); //for Argon
+Adafruit_NeoPixel strip(PIXEL_COUNT, D12, WS2812B);
 void rainbowRing(uint8_t hold);
 uint32_t Wheel(byte WheelPos);
 IoTTimer neoTimer;
@@ -116,7 +116,6 @@ SYSTEM_THREAD(ENABLED);
 
 // View logs with CLI using 'particle serial monitor --follow'
 SerialLogHandler logHandler(LOG_LEVEL_INFO);
-// setup() runs once, when the device is first turned on
 
 void setup() {
 waitFor(Serial.isConnected, 5000);
@@ -125,12 +124,11 @@ Serial1.begin(9600);
 delay(1000);
 
 Wire.begin(); // ToF start sequence
-// New Neo Code--------------------------------------------------
+// New Neo Code
 strip.begin();
 strip.show(); // Initialize all pixels to 'off'
 repeatCycle = TRUE;
 neoTimer.startTimer(20);
-//--------------------------------------------------- TOF New Code
 
 if (!lox.begin()) {
   Serial.println(F("Failed to boot VL53L0X"));
@@ -146,7 +144,7 @@ if (!lox.begin()) {
   while(1);
 }
  
- // Connect to Internet but not Particle Cloud
+// Connect to Internet but not Particle Cloud
 WiFi.on();
 WiFi.connect();
   while(WiFi.connecting()) {
@@ -159,7 +157,7 @@ mqtt.subscribe(&pumpFeed);
 mqtt.subscribe(&MP3Feed);
 mqtt.subscribe(&PixelRingFeed);
 
- // Particle Time
+// Particle Time
 Particle.connect;  
 Time.zone (-7); // MST = -7, MDT = -6
 Particle.syncTime (); // Sync time with Particle Cloud
@@ -169,7 +167,7 @@ pinMode(RESETBUTTON, INPUT);
 //Pump Pin
 pinMode (PUMPIN, OUTPUT);
 
- // NeoPixel Set Up----------------------------------------------------------------
+// NeoPixel Set Up
 pixel.begin ();
 pixel.setBrightness (64); // bri is a value 0 - 255
 pixel.show (); // initialize all off
@@ -182,12 +180,12 @@ if (!myDFPlayer.begin(Serial1)) {  //Use softwareSerial to communicate with mp3.
   while(true);
 }
 Serial.printf("DFPlayer Mini online.\n");
-myDFPlayer.volume(15);  //Set volume value. From 0 to 30
+myDFPlayer.volume(17);  //Set volume value. From 0 to 30
 myDFPlayer.loop(1);  //Play the first mp3
 // Millis Startime
 beginTime = millis();
-
 lastInterval = millis();
+
 // initialize BME
 status = bme.begin(0x76);
   if (status==false);{
@@ -210,47 +208,47 @@ lox.rangingTest(&measure, false); // pass in 'true' to get debug data printout!
 targetRange(); // Neopixel VOID function int for target ranges
 //Serial.printf("measure data %i\n",measure.RangeMilliMeter);
 if (measure.RangeStatus != 5) {  // phase failures have incorrect data
-    if(measure.RangeMilliMeter <= 70){
-      targetLoc1 = TRUE;
-      targetLoc2 = FALSE;
-      targetLoc3 = FALSE;
-      targetLoc4 = FALSE;
-      targetLoc0 = FALSE;
-    // Serial.printf("targetPos 1%i\n", targetLoc1);
-    }
-    else if(measure.RangeMilliMeter > 70 && measure.RangeMilliMeter < 150){
-      targetLoc2 = TRUE;
-      targetLoc1 = FALSE; 
-      targetLoc3 = FALSE;
-      targetLoc4 = FALSE;
-      targetLoc0 = FALSE;
-    // Serial.printf("targetPos 2%i\n", targetLoc2);
-    }
-    else if(measure.RangeMilliMeter > 150 && measure.RangeMilliMeter < 230){
-      targetLoc3 = TRUE;
-      targetLoc1 = FALSE; 
-      targetLoc2 = FALSE;
-      targetLoc4 = FALSE;
-      targetLoc0 = FALSE;
-     //Serial.printf("targetPos 3%i\n", targetLoc3);
-    }
-      else if (measure.RangeMilliMeter > 230 && measure.RangeMilliMeter < 400){
-      targetLoc4 = TRUE;
-      targetLoc1 = FALSE; 
-      targetLoc2 = FALSE; 
-      targetLoc3 = FALSE;
-      targetLoc0 = FALSE;
-     //Serial.printf("targetPos 0%i\n", targetLoc0);
+  if(measure.RangeMilliMeter <= 70){
+    targetLoc1 = TRUE;
+    targetLoc2 = FALSE;
+    targetLoc3 = FALSE;
+    targetLoc4 = FALSE;
+    targetLoc0 = FALSE;
+  // Serial.printf("targetPos 1%i\n", targetLoc1);
+  }
+  else if(measure.RangeMilliMeter > 70 && measure.RangeMilliMeter < 150){
+    targetLoc2 = TRUE;
+    targetLoc1 = FALSE; 
+    targetLoc3 = FALSE;
+    targetLoc4 = FALSE;
+    targetLoc0 = FALSE;
+  // Serial.printf("targetPos 2%i\n", targetLoc2);
+  }
+  else if(measure.RangeMilliMeter > 150 && measure.RangeMilliMeter < 230){
+    targetLoc3 = TRUE;
+    targetLoc1 = FALSE; 
+    targetLoc2 = FALSE;
+    targetLoc4 = FALSE;
+    targetLoc0 = FALSE;
+    //Serial.printf("targetPos 3%i\n", targetLoc3);
+  }
+  else if (measure.RangeMilliMeter > 230 && measure.RangeMilliMeter < 400){
+    targetLoc4 = TRUE;
+    targetLoc1 = FALSE; 
+    targetLoc2 = FALSE; 
+    targetLoc3 = FALSE;
+    targetLoc0 = FALSE;
+    //Serial.printf("targetPos 0%i\n", targetLoc0);
   }  
-      else if  (measure.RangeMilliMeter > 7000){//Reset
-      locTimer.startTimer(10000);
-      targetLoc0 = TRUE;
-      targetLoc1 = FALSE; 
-      targetLoc2 = FALSE; 
-      targetLoc3 = FALSE;
-      targetLoc4 = FALSE;
-     //Serial.printf("targetPos 0%i\n", targetLoc0);
- }
+  else if  (measure.RangeMilliMeter > 7000){ //Reset
+    locTimer.startTimer(10000);
+    targetLoc0 = TRUE;
+    targetLoc1 = FALSE; 
+    targetLoc2 = FALSE; 
+    targetLoc3 = FALSE;
+    targetLoc4 = FALSE;
+    //Serial.printf("targetPos 0%i\n", targetLoc0);
+  }
 } 
 
 MQTT_connect();
@@ -315,12 +313,12 @@ void WATERPUMP (){
     digitalWrite (PUMPIN, HIGH);
     pixel.setBrightness (128);
     pixelFill(4,4, turquoise);
-    Serial.printf("Pump Button On\n");
+    // Serial.printf("Pump Button On\n");
     } 
     else {
-    digitalWrite (PUMPIN, LOW);
-    pixelFill(4,4, black);
-    Serial.printf("Pump OFF \n");
+      digitalWrite (PUMPIN, LOW);
+      pixelFill(4,4, black);
+      // Serial.printf("Pump OFF \n");
     }
   }
 
@@ -339,19 +337,20 @@ void targetButton1(){
     if ((targetLoc1 == TRUE) || pixelDash == TRUE){
       neoOnOff= !neoOnOff;
       if (neoOnOff) {
-      repeatCycle = TRUE;
-      rainbowRing(20);
-      Serial.printf("Neo Ring On%i\n",targetLoc1);
-      Serial.printf("Neo Ring Dash On%i\n",pixelDash);
-      } else {
-      Serial.printf("Neo Ring Off%i\n",targetLoc1);
-      Serial.printf("Neo Ring Dash Off%i\n",pixelDash);
-      strip.clear();
-      strip.show();
+        repeatCycle = TRUE;
+        rainbowRing(20);
+        Serial.printf("Neo Ring On%i\n",targetLoc1);
+        Serial.printf("Neo Ring Dash On%i\n",pixelDash);
+      } 
+      else {
+        Serial.printf("Neo Ring Off%i\n",targetLoc1);
+        Serial.printf("Neo Ring Dash Off%i\n",pixelDash);
+        strip.clear();
+        strip.show();
       }
     }
-  prevTargetLoc1 = targetLoc1;
-  prevPixelDash = pixelDash;
+    prevTargetLoc1 = targetLoc1;
+    prevPixelDash = pixelDash;
   }
 }
 
@@ -361,20 +360,20 @@ void targetButton2(){
      Serial.printf("targetLoc 2 changed%i\n",targetLoc2);
     if ((targetLoc2 == TRUE) || mp3Dash == TRUE) {
       startStop = !startStop;
-      if (startStop || mp3Dash){
-        myDFPlayer.play(track%3+1);
-        Serial.printf("MP3 On%i\n",targetLoc2);
-        Serial.printf("MP3 Dash On%i\n",mp3Dash);
-      } else {
-      myDFPlayer.stop();
-      Serial.printf("MP3 Off%i\n",targetLoc2);
-      Serial.printf("MP3 Dash Off%i\n",mp3Dash);
-      //prevMp3Dash = mp3Dash;
-      track++;
+      if (startStop){
+        myDFPlayer.play(track%6+1);
+        // Serial.printf("MP3 On%i\n",targetLoc2);
+        // Serial.printf("MP3 Dash On%i\n",mp3Dash);
+      } 
+      else {
+        myDFPlayer.stop();
+        // Serial.printf("MP3 Off%i\n",targetLoc2);
+        // Serial.printf("MP3 Dash Off%i\n",mp3Dash);
+        track++;
       }
     }
-  prevTargetLoc2 = targetLoc2; // previous location
-  prevMp3Dash = mp3Dash;
+    prevTargetLoc2 = targetLoc2; // previous location
+    prevMp3Dash = mp3Dash;
   }
 }
 
@@ -382,76 +381,72 @@ void targetButton2(){
 void targetButton3(){
   if (targetLoc3 != prevTargetLoc3) {
     if (targetLoc3 == TRUE){
-      Serial.printf("%i,%i\n", targetLoc3, prevTargetLoc3);
+      //Serial.printf("%i,%i\n", targetLoc3, prevTargetLoc3);
       volOnOff = !volOnOff;
       if (volOnOff){
-        myDFPlayer.volume(30);
-        Serial.printf("Volume On%i\n",targetLoc3);
-      } else {
+        myDFPlayer.volume(28);
+        // Serial.printf("Volume On%i\n",targetLoc3);
+      } 
+      else {
         myDFPlayer.volume(0);
-        Serial.printf("Volume Off%i\n",targetLoc3);
+        //Serial.printf("Volume Off%i\n",targetLoc3);
       }
       pixel.show();
     }
-  prevTargetLoc3 = targetLoc3;
+    prevTargetLoc3 = targetLoc3;
   }
 }
 
  // Neopixel activation with TOF Ranges
 void targetRange() {
-  if(targetLoc1){   // Neopixel TOF location 1  NeoPixel Ring OnOFF
+  if(targetLoc1 || pixelDash){   //Neopixel TOF  & Dashboard location 1  NeoPixel Ring OnOFF
     if (neoOnOff){
-    //  repeatCycle = TRUE;
-     // rainbowRing(20);
-    pixelFill(0,3,teal);
+      pixelFill(0,3,teal);
     }
     else {
-    pixelFill(0,3,orange);
-    strip.clear();
-    strip.show();
+      pixelFill(0,3,orange);
+      strip.clear();
+      strip.show();
     }
   }
 
-  if(targetLoc2){   // Neopixel TOF location 2  MP3 Tracks OnOFF
+  if(targetLoc2 || mp3Dash){    //Neopixel TOF & Dashboard location 2  MP3 Tracks OnOFF
     if (startStop){
-    pixelFill(0,3,turquoise);
+      pixelFill(0,3,turquoise);
     }
     else {
-    pixelFill(0,3,magenta);
-    // myDFPlayer.stop(); don't know how this got here?
+      pixelFill(0,3,magenta);
     }
     pixel.show();
   }
 
-  if(targetLoc3){  // Neopixel TOF location 3  MP3 Volume OnOFF
+  if(targetLoc3){   //Neopixel TOF location 3  MP3 Volume OnOFF
     if (volOnOff){
-    pixelFill(0,3,blue);
+     pixelFill(0,3,blue);
     }
     else {
-    pixelFill(0,3,lime);
+      pixelFill(0,3,lime);
     }
     pixel.show();
   }
 
-  if(targetLoc4){  // Neopixel TOF location 0 Turn Off Black
+  if(targetLoc4){    //Neopixel TOF location 0 Turn Off Black
     blackOnOff =!blackOnOff;
     if (blackOnOff){
-    pixelFill(0,3, black);
+      pixelFill(0,3, black);
     }
   }
 
-  if(targetLoc0){  // Neopixel TOF reset
-  rainbowRing(20);
+  if(targetLoc0){    //Neopixel TOF reset
     if (neoOnOff == FALSE){
-    strip.show();
-    strip.clear();
       }
     if(locTimer.isTimerReady()){
-    pixelFill(0,3, black);
+      pixelFill(0,3, black);
     }
   }
 }
 
+// Rainbow Ring NeoPixel Functions
 void rainbowRing(uint8_t hold) {
   uint16_t k;
   static uint16_t j;
