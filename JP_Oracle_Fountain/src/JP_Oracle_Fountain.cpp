@@ -69,6 +69,7 @@ bool  pumpDash;
 
 // Millis Timer
 unsigned int beginTime;
+unsigned int duration;
 
 // Date and Time String
 String DateTime, TimeOnly; // String variable for Date and Time
@@ -104,6 +105,9 @@ void getConc ();
  
 SYSTEM_MODE(SEMI_AUTOMATIC);
 
+#if (PLATFORM_ID == 32)
+#endif
+#define PIXEL_TYPE WS2812B
 const int PIXEL_COUNT =12;
 Adafruit_NeoPixel strip(PIXEL_COUNT, D12, WS2812B);
 void rainbowRing(uint8_t hold);
@@ -111,7 +115,7 @@ uint32_t Wheel(byte WheelPos);
 IoTTimer neoTimer;
 IoTTimer locTimer;
 bool repeatCycle, pixelDash, prevPixelDash;
-
+void pixelRingOff();
 SYSTEM_THREAD(ENABLED);
 
 // View logs with CLI using 'particle serial monitor --follow'
@@ -189,7 +193,7 @@ lastInterval = millis();
 // initialize BME
 status = bme.begin(0x76);
   if (status==false);{
-  Serial.printf("BME280 at address 0x%02X failed to start\n", 0x76); // Adafruit_BME280 bme code
+  //Serial.printf("BME280 at address 0x%02X failed to start\n", 0x76); // Adafruit_BME280 bme code
   }
 startime = millis();
 }
@@ -240,7 +244,7 @@ if (measure.RangeStatus != 5) {  // phase failures have incorrect data
     targetLoc0 = FALSE;
     //Serial.printf("targetPos 0%i\n", targetLoc0);
   }  
-  else if  (measure.RangeMilliMeter > 7000){ //Reset
+  else if  (measure.RangeMilliMeter > 400){ //Reset 7000
     locTimer.startTimer(10000);
     targetLoc0 = TRUE;
     targetLoc1 = FALSE; 
@@ -339,12 +343,12 @@ void targetButton1(){
       if (neoOnOff) {
         repeatCycle = TRUE;
         rainbowRing(20);
-        Serial.printf("Neo Ring On%i\n",targetLoc1);
-        Serial.printf("Neo Ring Dash On%i\n",pixelDash);
+       // Serial.printf("Neo Ring On%i\n",targetLoc1);
+       // Serial.printf("Neo Ring Dash On%i\n",pixelDash);
       } 
       else {
-        Serial.printf("Neo Ring Off%i\n",targetLoc1);
-        Serial.printf("Neo Ring Dash Off%i\n",pixelDash);
+       // Serial.printf("Neo Ring Off%i\n",targetLoc1);
+       // Serial.printf("Neo Ring Dash Off%i\n",pixelDash);
         strip.clear();
         strip.show();
       }
@@ -422,7 +426,7 @@ void targetRange() {
 
   if(targetLoc3){   //Neopixel TOF location 3  MP3 Volume OnOFF
     if (volOnOff){
-     pixelFill(0,3,blue);
+      pixelFill(0,3,blue);
     }
     else {
       pixelFill(0,3,lime);
@@ -438,7 +442,10 @@ void targetRange() {
   }
 
   if(targetLoc0){    //Neopixel TOF reset
+    //rainbowRing(20);
     if (neoOnOff == FALSE){
+      strip.show();
+      strip.clear();
       }
     if(locTimer.isTimerReady()){
       pixelFill(0,3, black);

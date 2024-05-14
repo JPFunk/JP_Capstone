@@ -32,7 +32,6 @@ Concerns and Considerations (Project Risks and Potential Mitigation's)
   •  Dashboard/bluetooth/code-red functions
 
 Other Information:
-*OLED may/may not be used depending on design build. 
 The Capstone design will be built to emphasis IoT features, the MVP  production version will be refit with minimum E-components to accommodate a Starter Model not requiring P2 programming/connection.
 
 Hackster.io page
